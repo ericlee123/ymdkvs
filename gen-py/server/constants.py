@@ -12,8 +12,3 @@ from thrift.TRecursive import fix_spec
 
 import sys
 from .ttypes import *
-INT32CONSTANT = 9853
-MAPCONSTANT = {
-    "hello": "world",
-    "goodnight": "moon",
-}
