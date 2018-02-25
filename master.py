@@ -36,60 +36,78 @@ class Master:
 
     def __init__(self):
         self.openPort = 6262
-        self.idToHandle = dict()
-        self.servers = set()
+        self.handles = dict() # id -> handle
+        self.procs = dict() # id -> process
 
     def listen(self):
         for cmd in sys.stdin:
-            print cmd
+            print cmd[:-1]
             args = cmd.split(" ")
             if args[0] == "joinServer":
                 self.joinServer(int(args[1]))
+            elif args[0] == "killServer":
+                self.killServer(int(args[1]))
+            elif args[0] == "joinClient":
+                self.joinClient(int(args[1]), int(args[2]))
+            elif args[0] == "breakConnection":
+                self.breakConnection(int(args[1]), int(args[2]))
+            elif args[0] == "createConnection":
+                self.createConnection(int(args[1]), int(args[2]))
 
-        for s in self.servers:
-            s.terminate()
 
-    def spinUpClient(self, id):
-        p = Process(target=spinUpClient, args=(self.openPort,))
-        p.start()
-        self.servers.add(p)
-
-        time.sleep(2)
-
-        transport = TSocket.TSocket('localhost', self.openPort)
-        transport = TTransport.TBufferedTransport(transport)
-        protocol = TBinaryProtocol.TBinaryProtocol(transport)
-        replica = Client.Client(protocol)
-        transport.open()
-        self.idToHandle[id] = replica
-        self.openPort += 1
+        for _, p in self.procs.items():
+            p.terminate()
 
     def joinServer(self, id):
         p = Process(target=spinUpServer, args=(self.openPort,))
         p.start()
-        self.servers.add(p)
+        self.procs[id] = p
 
-        time.sleep(2)
+        time.sleep(1) # messy
 
         transport = TSocket.TSocket('localhost', self.openPort)
         transport = TTransport.TBufferedTransport(transport)
         protocol = TBinaryProtocol.TBinaryProtocol(transport)
         replica = Replica.Client(protocol)
         transport.open()
-        self.idToHandle[id] = replica
+
+        for _, server in self.handles.items():
+            server.addConnection(id)
+
+        self.handles[id] = replica
         self.openPort += 1
 
     def killServer(self, id):
-        print("killServer " + str(id))
+        for _, server in self.handles.items():
+            server.removeConnection(id)
+        self.handles.pop(id, None)
+        self.procs[id].terminate()
 
     def joinClient(self, clientID, serverID):
-        print("joinClient " + str(clientID) + " " + str(serverID))
+        p = Process(target=spinUpClient, args=(self.openPort,))
+        p.start()
+        self.procs[id] = p
+
+        time.sleep(1) # messy
+
+        transport = TSocket.TSocket('localhost', self.openPort)
+        transport = TTransport.TBufferedTransport(transport)
+        protocol = TBinaryProtocol.TBinaryProtocol(transport)
+        client = Client.Client(protocol)
+        transport.open()
+        self.handles[clientID] = client
+        self.openPort += 1
+
+        self.handles[serverID].addConnection(clientID)
+        client.addConnection(serverID)
 
     def breakConnection(self, id1, id2):
-        print("breakConnection " + str(id1) + " " + str(id2))
+        self.handles[id1].removeConnection(id2)
+        self.handles[id2].removeConnection(id1)
 
     def createConnection(self, id1, id2):
-        print("createConnection " + str(id1) + " " + str(id2))
+        self.handles[id1].addConnection(id2)
+        self.handles[id2].addConnection(id1)
 
     def stabilize(self):
         print("stabilize")
@@ -103,42 +121,6 @@ class Master:
     def get(self, clientID, key):
         print("get " + str(clientID) + " " + key)
 
-class ServerThread(threading.Thread):
-
-    def __init__(self, threadID, port):
-        threading.Thread.__init__(self)
-        self.id = threadID
-        self.port = port
-
-    def run(self):
-        handler = ReplicaHandler()
-        processor = Replica.Processor(handler)
-        transport = TSocket.TServerSocket(host='localhost', port=self.port)
-        tfactory = TTransport.TBufferedTransportFactory()
-        pfactory = TBinaryProtocol.TBinaryProtocolFactory()
-        server = TServer.TSimpleServer(processor, transport, tfactory, pfactory)
-        try:
-            server.serve()
-        except SystemExit, KeyboardInterrupt:
-            print "in here"
-            return
-
-
-class ClientThread(threading.Thread):
-
-    def __init__(self, threadID, port):
-        threading.Thread.__init__(self)
-        self.id = threadID
-        self.port = port
-
-    def run(self):
-        handler = ClientHandler()
-        processor = Replica.Processor(handler)
-        transport = TSocket.TServerSocket(host='localhost', port=self.port)
-        tfactory = TTransport.TBufferedTransportFactory()
-        pfactory = TBinaryProtocol.TBinaryProtocolFactory()
-        server = TServer.TSimpleServer(processor, transport, tfactory, pfactory)
-        server.serve()
 
 if __name__ == "__main__":
     master = Master()
