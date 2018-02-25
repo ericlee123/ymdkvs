@@ -1,5 +1,3 @@
-
-
 service Client {
     bool addConnection(1: i32 id);
     bool removeConnection(1: i32 id);
