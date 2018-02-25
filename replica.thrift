@@ -1,6 +1,6 @@
 
 
-service Server {
+service Replica {
     bool addConnection(1: i32 id);
     bool removeConnection(1: i32 id);
     map<string, string> getStore();

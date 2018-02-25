@@ -16,18 +16,19 @@ else:
 from thrift.transport import TTransport, TSocket, TSSLSocket, THttpClient
 from thrift.protocol.TBinaryProtocol import TBinaryProtocol
 
-from server import ServerService
-from server.ttypes import *
+from replica import Replica
+from replica.ttypes import *
 
 if len(sys.argv) <= 1 or sys.argv[1] == '--help':
     print('')
     print('Usage: ' + sys.argv[0] + ' [-h host[:port]] [-u url] [-f[ramed]] [-s[sl]] [-novalidate] [-ca_certs certs] [-keyfile keyfile] [-certfile certfile] function [arg1 [arg2...]]')
     print('')
     print('Functions:')
-    print('  bool addConnection(i32 index)')
-    print('  bool removeConnection(i32 index)')
+    print('  bool addConnection(i32 id)')
+    print('  bool removeConnection(i32 id)')
     print('   getStore()')
     print('  bool write(string key, string value)')
+    print('  string read(string key)')
     print('')
     sys.exit(0)
 
@@ -104,7 +105,7 @@ else:
     else:
         transport = TTransport.TBufferedTransport(socket)
 protocol = TBinaryProtocol(transport)
-client = ServerService.Client(protocol)
+client = Replica.Client(protocol)
 transport.open()
 
 if cmd == 'addConnection':
@@ -130,6 +131,12 @@ elif cmd == 'write':
         print('write requires 2 args')
         sys.exit(1)
     pp.pprint(client.write(args[0], args[1],))
+
+elif cmd == 'read':
+    if len(args) != 1:
+        print('read requires 1 args')
+        sys.exit(1)
+    pp.pprint(client.read(args[0],))
 
 else:
     print('Unrecognized method %s' % cmd)

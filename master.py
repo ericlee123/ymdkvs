@@ -1,5 +1,13 @@
 import sys
 
+# thrift stuff
+sys.path.append('gen-py')
+from replica import Replica
+from thrift import Thrift
+from thrift.transport import TSocket
+from thrift.transport import TTransport
+from thrift.protocol import TBinaryProtocol
+
 class Master:
 
     def __init__(self):
@@ -38,5 +46,12 @@ class Master:
         print("get " + str(clientID) + " " + key)
 
 if __name__ == "__main__":
-    master = Master()
-    master.listen()
+    # master = Master()
+    # master.listen()
+
+    # thrift setup
+    transport = TSocket.TSocket('localhost', 9090)
+    transport = TTransport.TBufferedTransport(transport)
+    protocol = TBinaryProtocol.TBinaryProtocol(transport)
+    replica = Replica.Client(protocol)
+    transport.open()
