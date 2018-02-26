@@ -36,7 +36,7 @@ class Master:
 
     def __init__(self):
         self.openPort = 6262
-        self.handles = dict() # id -> handle
+        self.stubs = dict() # id -> stub
         self.procs = dict() # id -> process
 
     def listen(self):
@@ -67,68 +67,76 @@ class Master:
             p.terminate()
 
     def joinServer(self, id):
+        # start replica server
         p = Process(target=spinUpServer, args=(self.openPort,))
-        p.start()
         self.procs[id] = p
+        p.start()
 
-        time.sleep(1) # messy
+        time.sleep(1) # wait for server.serve() [messy]
 
+        # set up RPC to replica server
         transport = TSocket.TSocket('localhost', self.openPort)
         transport = TTransport.TBufferedTransport(transport)
         protocol = TBinaryProtocol.TBinaryProtocol(transport)
         replica = Replica.Client(protocol)
         transport.open()
 
-        for _, server in self.handles.items():
+        # connect everyone
+        for sid, server in self.stubs.items():
             server.addConnection(id)
+            replica.addConnection(sid)
 
-        self.handles[id] = replica
+        self.stubs[id] = replica
         self.openPort += 1
 
     def killServer(self, id):
-        for _, server in self.handles.items():
+        for _, server in self.stubs.items():
             server.removeConnection(id)
-        self.handles.pop(id, None)
+        self.stubs.pop(id, None)
         self.procs[id].terminate()
 
     def joinClient(self, clientID, serverID):
+        # start client server
         p = Process(target=spinUpClient, args=(self.openPort,))
-        p.start()
         self.procs[id] = p
+        p.start()
 
-        time.sleep(1) # messy
+        time.sleep(1) # wait for server.serve() [messy]
 
+        # set up RPC to client server
         transport = TSocket.TSocket('localhost', self.openPort)
         transport = TTransport.TBufferedTransport(transport)
         protocol = TBinaryProtocol.TBinaryProtocol(transport)
         client = Client.Client(protocol)
         transport.open()
-        self.handles[clientID] = client
+
+        self.stubs[clientID] = client
         self.openPort += 1
 
-        self.handles[serverID].addConnection(clientID)
         client.addConnection(serverID)
+        self.stubs[serverID].addConnection(clientID)
 
     def breakConnection(self, id1, id2):
-        self.handles[id1].removeConnection(id2)
-        self.handles[id2].removeConnection(id1)
+        self.stubs[id1].removeConnection(id2)
+        self.stubs[id2].removeConnection(id1)
 
     def createConnection(self, id1, id2):
-        self.handles[id1].addConnection(id2)
-        self.handles[id2].addConnection(id1)
+        self.stubs[id1].addConnection(id2)
+        self.stubs[id2].addConnection(id1)
 
     def stabilize(self):
+        # TODO: within all connected components, wait for all stores to converge
         print("stabilize")
 
     def printStore(self, id):
-        for k, v in self.handles[id].getStore().items():
+        for k, v in self.stubs[id].getStore().items():
             print k + ":" + v
 
     def put(self, clientID, key, value):
-        self.handles[clientID].requestWrite(key, value)
+        self.stubs[clientID].requestWrite(key, value)
 
     def get(self, clientID, key):
-        value = self.handles[clientID].requestRead(key)
+        value = self.stubs[clientID].requestRead(key)
         print key + ":" + value
 
 
