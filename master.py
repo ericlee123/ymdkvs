@@ -53,6 +53,10 @@ class Master:
                 self.breakConnection(int(args[1]), int(args[2]))
             elif args[0] == "createConnection":
                 self.createConnection(int(args[1]), int(args[2]))
+            elif args[0] == "stabilize":
+                self.stabilize()
+            elif args[0] == "printStore":
+                self.printStore(int(args[1]))
 
 
         for _, p in self.procs.items():
@@ -113,7 +117,8 @@ class Master:
         print("stabilize")
 
     def printStore(self, id):
-        print("printStore " + str(id))
+        for k, v in self.handles[id].getStore().items():
+            print k + ":" + v
 
     def put(self, clientID, key, value):
         print("put " + str(clientID) + " " + key + " "  + value)
