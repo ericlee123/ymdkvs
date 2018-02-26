@@ -57,6 +57,10 @@ class Master:
                 self.stabilize()
             elif args[0] == "printStore":
                 self.printStore(int(args[1]))
+            elif args[0] == "put":
+                self.put(int(args[1]), int(args[2]), int(args[3]))
+            elif args[0] == "get":
+                self.get(int(args[1]), int(args[2]))
 
 
         for _, p in self.procs.items():
@@ -121,10 +125,11 @@ class Master:
             print k + ":" + v
 
     def put(self, clientID, key, value):
-        print("put " + str(clientID) + " " + key + " "  + value)
+        self.handles[clientID].requestWrite(key, value)
 
     def get(self, clientID, key):
-        print("get " + str(clientID) + " " + key)
+        value = self.handles[clientID].requestRead(key)
+        print key + ":" + value
 
 
 if __name__ == "__main__":
