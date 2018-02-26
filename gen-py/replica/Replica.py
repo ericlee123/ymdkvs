@@ -36,18 +36,20 @@ class Iface(object):
     def getStore(self):
         pass
 
-    def write(self, key, value):
+    def write(self, key, value, version):
         """
         Parameters:
          - key
          - value
+         - version
         """
         pass
 
-    def read(self, key):
+    def read(self, key, version):
         """
         Parameters:
          - key
+         - version
         """
         pass
 
@@ -147,20 +149,22 @@ class Client(Iface):
             return result.success
         raise TApplicationException(TApplicationException.MISSING_RESULT, "getStore failed: unknown result")
 
-    def write(self, key, value):
+    def write(self, key, value, version):
         """
         Parameters:
          - key
          - value
+         - version
         """
-        self.send_write(key, value)
+        self.send_write(key, value, version)
         return self.recv_write()
 
-    def send_write(self, key, value):
+    def send_write(self, key, value, version):
         self._oprot.writeMessageBegin('write', TMessageType.CALL, self._seqid)
         args = write_args()
         args.key = key
         args.value = value
+        args.version = version
         args.write(self._oprot)
         self._oprot.writeMessageEnd()
         self._oprot.trans.flush()
@@ -180,18 +184,20 @@ class Client(Iface):
             return result.success
         raise TApplicationException(TApplicationException.MISSING_RESULT, "write failed: unknown result")
 
-    def read(self, key):
+    def read(self, key, version):
         """
         Parameters:
          - key
+         - version
         """
-        self.send_read(key)
+        self.send_read(key, version)
         return self.recv_read()
 
-    def send_read(self, key):
+    def send_read(self, key, version):
         self._oprot.writeMessageBegin('read', TMessageType.CALL, self._seqid)
         args = read_args()
         args.key = key
+        args.version = version
         args.write(self._oprot)
         self._oprot.writeMessageEnd()
         self._oprot.trans.flush()
@@ -312,7 +318,7 @@ class Processor(Iface, TProcessor):
         iprot.readMessageEnd()
         result = write_result()
         try:
-            result.success = self._handler.write(args.key, args.value)
+            result.success = self._handler.write(args.key, args.value, args.version)
             msg_type = TMessageType.REPLY
         except TTransport.TTransportException:
             raise
@@ -335,7 +341,7 @@ class Processor(Iface, TProcessor):
         iprot.readMessageEnd()
         result = read_result()
         try:
-            result.success = self._handler.read(args.key)
+            result.success = self._handler.read(args.key, args.version)
             msg_type = TMessageType.REPLY
         except TTransport.TTransportException:
             raise
@@ -715,12 +721,14 @@ class write_args(object):
     Attributes:
      - key
      - value
+     - version
     """
 
 
-    def __init__(self, key=None, value=None,):
+    def __init__(self, key=None, value=None, version=None,):
         self.key = key
         self.value = value
+        self.version = version
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -741,6 +749,11 @@ class write_args(object):
                     self.value = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
                 else:
                     iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.I32:
+                    self.version = iprot.readI32()
+                else:
+                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -758,6 +771,10 @@ class write_args(object):
         if self.value is not None:
             oprot.writeFieldBegin('value', TType.STRING, 2)
             oprot.writeString(self.value.encode('utf-8') if sys.version_info[0] == 2 else self.value)
+            oprot.writeFieldEnd()
+        if self.version is not None:
+            oprot.writeFieldBegin('version', TType.I32, 3)
+            oprot.writeI32(self.version)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -780,6 +797,7 @@ write_args.thrift_spec = (
     None,  # 0
     (1, TType.STRING, 'key', 'UTF8', None, ),  # 1
     (2, TType.STRING, 'value', 'UTF8', None, ),  # 2
+    (3, TType.I32, 'version', None, None, ),  # 3
 )
 
 
@@ -847,11 +865,13 @@ class read_args(object):
     """
     Attributes:
      - key
+     - version
     """
 
 
-    def __init__(self, key=None,):
+    def __init__(self, key=None, version=None,):
         self.key = key
+        self.version = version
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -867,6 +887,11 @@ class read_args(object):
                     self.key = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
                 else:
                     iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.I32:
+                    self.version = iprot.readI32()
+                else:
+                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -880,6 +905,10 @@ class read_args(object):
         if self.key is not None:
             oprot.writeFieldBegin('key', TType.STRING, 1)
             oprot.writeString(self.key.encode('utf-8') if sys.version_info[0] == 2 else self.key)
+            oprot.writeFieldEnd()
+        if self.version is not None:
+            oprot.writeFieldBegin('version', TType.I32, 2)
+            oprot.writeI32(self.version)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -901,6 +930,7 @@ all_structs.append(read_args)
 read_args.thrift_spec = (
     None,  # 0
     (1, TType.STRING, 'key', 'UTF8', None, ),  # 1
+    (2, TType.I32, 'version', None, None, ),  # 2
 )
 
 
