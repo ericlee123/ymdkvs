@@ -130,8 +130,8 @@ class Master:
         client.addConnection(serverID, self.ports[serverID])
         transport.close()
 
-        self.ports[id] = self.openPort
-        self.procs[id] = p
+        self.ports[clientID] = self.openPort
+        self.procs[clientID] = p
         self.stubs[clientID] = client
         self.transports[clientID] = transport
         self.openPort += 1
@@ -150,12 +150,8 @@ class Master:
         while True:
             store = None
             match = True
-            print "==================================="
             for r in self.replicas:
-                print "opening"
                 self.transports[r].open()
-                print "opened"
-                print self.stubs[r].getStore()
                 if store is None:
                     store = self.stubs[r].getStore()
                 elif store != self.stubs[r].getStore():
@@ -164,7 +160,6 @@ class Master:
                     break
                 self.transports[r].close()
             if match:
-                print "MATCHA"
                 return
 
     def printStore(self, id):
