@@ -63,13 +63,14 @@ class Iface(object):
         """
         pass
 
-    def gossip(self, key, value, breadcrumbs, seen):
+    def gossip(self, key, value, version, seen, cid):
         """
         Parameters:
          - key
          - value
-         - breadcrumbs
+         - version
          - seen
+         - cid
         """
         pass
 
@@ -270,24 +271,26 @@ class Client(Iface):
             return result.success
         raise TApplicationException(TApplicationException.MISSING_RESULT, "read failed: unknown result")
 
-    def gossip(self, key, value, breadcrumbs, seen):
+    def gossip(self, key, value, version, seen, cid):
         """
         Parameters:
          - key
          - value
-         - breadcrumbs
+         - version
          - seen
+         - cid
         """
-        self.send_gossip(key, value, breadcrumbs, seen)
+        self.send_gossip(key, value, version, seen, cid)
         self.recv_gossip()
 
-    def send_gossip(self, key, value, breadcrumbs, seen):
+    def send_gossip(self, key, value, version, seen, cid):
         self._oprot.writeMessageBegin('gossip', TMessageType.CALL, self._seqid)
         args = gossip_args()
         args.key = key
         args.value = value
-        args.breadcrumbs = breadcrumbs
+        args.version = version
         args.seen = seen
+        args.cid = cid
         args.write(self._oprot)
         self._oprot.writeMessageEnd()
         self._oprot.trans.flush()
@@ -477,7 +480,7 @@ class Processor(Iface, TProcessor):
         iprot.readMessageEnd()
         result = gossip_result()
         try:
-            self._handler.gossip(args.key, args.value, args.breadcrumbs, args.seen)
+            self._handler.gossip(args.key, args.value, args.version, args.seen, args.cid)
             msg_type = TMessageType.REPLY
         except TTransport.TTransportException:
             raise
@@ -1259,16 +1262,18 @@ class gossip_args(object):
     Attributes:
      - key
      - value
-     - breadcrumbs
+     - version
      - seen
+     - cid
     """
 
 
-    def __init__(self, key=None, value=None, breadcrumbs=None, seen=None,):
+    def __init__(self, key=None, value=None, version=None, seen=None, cid=None,):
         self.key = key
         self.value = value
-        self.breadcrumbs = breadcrumbs
+        self.version = version
         self.seen = seen
+        self.cid = cid
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -1290,24 +1295,23 @@ class gossip_args(object):
                 else:
                     iprot.skip(ftype)
             elif fid == 3:
-                if ftype == TType.MAP:
-                    self.breadcrumbs = {}
-                    (_ktype10, _vtype11, _size9) = iprot.readMapBegin()
-                    for _i13 in range(_size9):
-                        _key14 = iprot.readI32()
-                        _val15 = iprot.readI32()
-                        self.breadcrumbs[_key14] = _val15
-                    iprot.readMapEnd()
+                if ftype == TType.I32:
+                    self.version = iprot.readI32()
                 else:
                     iprot.skip(ftype)
             elif fid == 4:
                 if ftype == TType.SET:
                     self.seen = set()
-                    (_etype19, _size16) = iprot.readSetBegin()
-                    for _i20 in range(_size16):
-                        _elem21 = iprot.readI32()
-                        self.seen.add(_elem21)
+                    (_etype12, _size9) = iprot.readSetBegin()
+                    for _i13 in range(_size9):
+                        _elem14 = iprot.readI32()
+                        self.seen.add(_elem14)
                     iprot.readSetEnd()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 5:
+                if ftype == TType.I32:
+                    self.cid = iprot.readI32()
                 else:
                     iprot.skip(ftype)
             else:
@@ -1328,20 +1332,20 @@ class gossip_args(object):
             oprot.writeFieldBegin('value', TType.STRING, 2)
             oprot.writeString(self.value.encode('utf-8') if sys.version_info[0] == 2 else self.value)
             oprot.writeFieldEnd()
-        if self.breadcrumbs is not None:
-            oprot.writeFieldBegin('breadcrumbs', TType.MAP, 3)
-            oprot.writeMapBegin(TType.I32, TType.I32, len(self.breadcrumbs))
-            for kiter22, viter23 in self.breadcrumbs.items():
-                oprot.writeI32(kiter22)
-                oprot.writeI32(viter23)
-            oprot.writeMapEnd()
+        if self.version is not None:
+            oprot.writeFieldBegin('version', TType.I32, 3)
+            oprot.writeI32(self.version)
             oprot.writeFieldEnd()
         if self.seen is not None:
             oprot.writeFieldBegin('seen', TType.SET, 4)
             oprot.writeSetBegin(TType.I32, len(self.seen))
-            for iter24 in self.seen:
-                oprot.writeI32(iter24)
+            for iter15 in self.seen:
+                oprot.writeI32(iter15)
             oprot.writeSetEnd()
+            oprot.writeFieldEnd()
+        if self.cid is not None:
+            oprot.writeFieldBegin('cid', TType.I32, 5)
+            oprot.writeI32(self.cid)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -1364,8 +1368,9 @@ gossip_args.thrift_spec = (
     None,  # 0
     (1, TType.STRING, 'key', 'UTF8', None, ),  # 1
     (2, TType.STRING, 'value', 'UTF8', None, ),  # 2
-    (3, TType.MAP, 'breadcrumbs', (TType.I32, None, TType.I32, None, False), None, ),  # 3
+    (3, TType.I32, 'version', None, None, ),  # 3
     (4, TType.SET, 'seen', (TType.I32, None, False), None, ),  # 4
+    (5, TType.I32, 'cid', None, None, ),  # 5
 )
 
 

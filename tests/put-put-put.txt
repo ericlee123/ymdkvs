@@ -1,0 +1,19 @@
+joinServer 0
+joinServer 1
+joinServer 2
+joinServer 3
+joinServer 4
+joinServer 9
+joinClient 10 0
+joinClient 10 9
+put 10 0 1111111111
+put 10 00 111111111
+put 10 000 11111111
+put 10 0000 1111111
+put 10 00000 111111
+put 10 000000 11111
+put 10 0000000 1111
+put 10 00000000 111
+put 10 000000000 11
+put 10 0000000000 1
+stabilize

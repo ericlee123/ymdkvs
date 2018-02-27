@@ -80,7 +80,7 @@ class Master:
         p = Process(target=spinUpServer, args=(self.openPort,))
         p.start()
 
-        time.sleep(0.5) # wait for server.serve() [messy]
+        time.sleep(0.1) # wait for server.serve() [messy]
 
         # set up RPC to replica server
         transport = TSocket.TSocket('localhost', self.openPort)
@@ -116,7 +116,7 @@ class Master:
         p = Process(target=spinUpClient, args=(self.openPort,))
         p.start()
 
-        time.sleep(0.5) # wait for server.serve() [messy]
+        time.sleep(0.1) # wait for server.serve() [messy]
 
         # set up RPC to client server
         transport = TSocket.TSocket('localhost', self.openPort)
@@ -127,9 +127,6 @@ class Master:
         transport.open()
         client.setID(clientID)
         client.addConnection(serverID, self.ports[serverID])
-        self.transports[serverID].open()
-        self.stubs[serverID].addConnection(clientID, self.openPort)
-        self.transports[serverID].close()
         transport.close()
 
         self.ports[id] = self.openPort

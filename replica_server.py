@@ -1,5 +1,6 @@
 import sys
 import thread
+import threading
 
 # thrift stuff
 sys.path.append('gen-py')
@@ -18,7 +19,7 @@ class ReplicaHandler:
         self.num_servers = 0 # this should be initialized after talking to every other server
         self.reachable = set()
         self.stubs = dict()
-        self.transports = dict()
+        self.transports = dict() # id -> (transport, lock)
         self.ts = 0
 
     def setID(self, id):
@@ -33,14 +34,17 @@ class ReplicaHandler:
         transport.open()
         self.reachable.add(id)
         self.stubs[id] = replica
-        self.transports[id] = transport
+        self.transports[id] = (transport, threading.Lock())
         transport.close()
 
         return id in self.reachable
 
     def removeConnection(self, id):
         self.reachable.remove(id)
-        self.transports[id].close()
+        transport, lock = self.transports[id]
+        lock.acquire(True)
+        transport.close()
+        lock.release()
         self.stubs.pop(id, None)
         return id not in self.reachable
 
@@ -58,9 +62,7 @@ class ReplicaHandler:
         else:
             self.kv_store[key] = (value, {cid: version})
         seen = {self.id}
-
-        # thread.start_new_thread(self.gossip, (key, value, version, seen))
-        # self.gossip(key, value, version, seen)
+        thread.start_new_thread(self.gossip, (key, value, version, seen, cid))
 
     def read(self, key, cid, version):
         if key not in self.kv_store:
@@ -84,21 +86,29 @@ class ReplicaHandler:
             rr.version = -1
             return rr
 
-    def gossip(self, key, value, version, seen):
+    def gossip(self, key, value, version, seen, cid):
         if key not in self.kv_store:
-            self.kv_store[key] = (value, version)
+            self.kv_store[key] = (value, {cid: version})
+            seen.add(self.id)
         else:
-            my_value, my_version = self.kv_store[key]
-            if version >= my_version: # if more updated
-                self.kv_store[key] = (value, version)
+            my_value, my_breadcrumbs = self.kv_store[key]
+            if version >= my_breadcrumbs[cid]: # gossip more up-to-date
+                my_breadcrumbs[cid] = version
+                self.kv_store[key] = (value, my_breadcrumbs)
                 seen.add(self.id)
-                for r in self.reachable.difference(seen):
-                    self.transports[r].open()
-                    self.stubs[r].gossip(key, value, version, seen)
-                    self.transports[r].close()
-            else:
-                myself = {self.id}
-                for r in self.reachable.difference(myself):
-                    self.transports[r].open()
-                    self.stubs[r].gossip(key, my_value, my_version, myself)
-                    self.transports[r].close()
+            else: # me more up-to-date
+                seen = {self.id}
+                value = my_value
+                version = my_breadcrumbs[cid]
+
+        # TODO: make this multithreaded
+        for r in self.reachable.difference(seen):
+            thread.start_new_thread(self.sendGossip, (key, value, version, seen, r, cid))
+
+    def sendGossip(self, key, value, version, seen, rid, cid):
+        transport, lock = self.transports[rid]
+        lock.acquire(True)
+        transport.open()
+        self.stubs[rid].gossip(key, value, version, seen, cid)
+        transport.close()
+        lock.release()
