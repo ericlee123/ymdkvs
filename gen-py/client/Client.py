@@ -19,10 +19,18 @@ all_structs = []
 
 
 class Iface(object):
-    def addConnection(self, id):
+    def setID(self, id):
         """
         Parameters:
          - id
+        """
+        pass
+
+    def addConnection(self, id, port):
+        """
+        Parameters:
+         - id
+         - port
         """
         pass
 
@@ -56,18 +64,49 @@ class Client(Iface):
             self._oprot = oprot
         self._seqid = 0
 
-    def addConnection(self, id):
+    def setID(self, id):
         """
         Parameters:
          - id
         """
-        self.send_addConnection(id)
+        self.send_setID(id)
+        self.recv_setID()
+
+    def send_setID(self, id):
+        self._oprot.writeMessageBegin('setID', TMessageType.CALL, self._seqid)
+        args = setID_args()
+        args.id = id
+        args.write(self._oprot)
+        self._oprot.writeMessageEnd()
+        self._oprot.trans.flush()
+
+    def recv_setID(self):
+        iprot = self._iprot
+        (fname, mtype, rseqid) = iprot.readMessageBegin()
+        if mtype == TMessageType.EXCEPTION:
+            x = TApplicationException()
+            x.read(iprot)
+            iprot.readMessageEnd()
+            raise x
+        result = setID_result()
+        result.read(iprot)
+        iprot.readMessageEnd()
+        return
+
+    def addConnection(self, id, port):
+        """
+        Parameters:
+         - id
+         - port
+        """
+        self.send_addConnection(id, port)
         return self.recv_addConnection()
 
-    def send_addConnection(self, id):
+    def send_addConnection(self, id, port):
         self._oprot.writeMessageBegin('addConnection', TMessageType.CALL, self._seqid)
         args = addConnection_args()
         args.id = id
+        args.port = port
         args.write(self._oprot)
         self._oprot.writeMessageEnd()
         self._oprot.trans.flush()
@@ -125,7 +164,7 @@ class Client(Iface):
          - value
         """
         self.send_requestWrite(key, value)
-        return self.recv_requestWrite()
+        self.recv_requestWrite()
 
     def send_requestWrite(self, key, value):
         self._oprot.writeMessageBegin('requestWrite', TMessageType.CALL, self._seqid)
@@ -147,9 +186,7 @@ class Client(Iface):
         result = requestWrite_result()
         result.read(iprot)
         iprot.readMessageEnd()
-        if result.success is not None:
-            return result.success
-        raise TApplicationException(TApplicationException.MISSING_RESULT, "requestWrite failed: unknown result")
+        return
 
     def requestRead(self, key):
         """
@@ -187,6 +224,7 @@ class Processor(Iface, TProcessor):
     def __init__(self, handler):
         self._handler = handler
         self._processMap = {}
+        self._processMap["setID"] = Processor.process_setID
         self._processMap["addConnection"] = Processor.process_addConnection
         self._processMap["removeConnection"] = Processor.process_removeConnection
         self._processMap["requestWrite"] = Processor.process_requestWrite
@@ -207,13 +245,36 @@ class Processor(Iface, TProcessor):
             self._processMap[name](self, seqid, iprot, oprot)
         return True
 
+    def process_setID(self, seqid, iprot, oprot):
+        args = setID_args()
+        args.read(iprot)
+        iprot.readMessageEnd()
+        result = setID_result()
+        try:
+            self._handler.setID(args.id)
+            msg_type = TMessageType.REPLY
+        except TTransport.TTransportException:
+            raise
+        except TApplicationException as ex:
+            logging.exception('TApplication exception in handler')
+            msg_type = TMessageType.EXCEPTION
+            result = ex
+        except Exception:
+            logging.exception('Unexpected exception in handler')
+            msg_type = TMessageType.EXCEPTION
+            result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
+        oprot.writeMessageBegin("setID", msg_type, seqid)
+        result.write(oprot)
+        oprot.writeMessageEnd()
+        oprot.trans.flush()
+
     def process_addConnection(self, seqid, iprot, oprot):
         args = addConnection_args()
         args.read(iprot)
         iprot.readMessageEnd()
         result = addConnection_result()
         try:
-            result.success = self._handler.addConnection(args.id)
+            result.success = self._handler.addConnection(args.id, args.port)
             msg_type = TMessageType.REPLY
         except TTransport.TTransportException:
             raise
@@ -259,7 +320,7 @@ class Processor(Iface, TProcessor):
         iprot.readMessageEnd()
         result = requestWrite_result()
         try:
-            result.success = self._handler.requestWrite(args.key, args.value)
+            self._handler.requestWrite(args.key, args.value)
             msg_type = TMessageType.REPLY
         except TTransport.TTransportException:
             raise
@@ -302,7 +363,7 @@ class Processor(Iface, TProcessor):
 # HELPER FUNCTIONS AND STRUCTURES
 
 
-class addConnection_args(object):
+class setID_args(object):
     """
     Attributes:
      - id
@@ -335,10 +396,125 @@ class addConnection_args(object):
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
+        oprot.writeStructBegin('setID_args')
+        if self.id is not None:
+            oprot.writeFieldBegin('id', TType.I32, 1)
+            oprot.writeI32(self.id)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+all_structs.append(setID_args)
+setID_args.thrift_spec = (
+    None,  # 0
+    (1, TType.I32, 'id', None, None, ),  # 1
+)
+
+
+class setID_result(object):
+
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('setID_result')
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+all_structs.append(setID_result)
+setID_result.thrift_spec = (
+)
+
+
+class addConnection_args(object):
+    """
+    Attributes:
+     - id
+     - port
+    """
+
+
+    def __init__(self, id=None, port=None,):
+        self.id = id
+        self.port = port
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I32:
+                    self.id = iprot.readI32()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.I32:
+                    self.port = iprot.readI32()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
         oprot.writeStructBegin('addConnection_args')
         if self.id is not None:
             oprot.writeFieldBegin('id', TType.I32, 1)
             oprot.writeI32(self.id)
+            oprot.writeFieldEnd()
+        if self.port is not None:
+            oprot.writeFieldBegin('port', TType.I32, 2)
+            oprot.writeI32(self.port)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -360,6 +536,7 @@ all_structs.append(addConnection_args)
 addConnection_args.thrift_spec = (
     None,  # 0
     (1, TType.I32, 'id', None, None, ),  # 1
+    (2, TType.I32, 'port', None, None, ),  # 2
 )
 
 
@@ -618,14 +795,7 @@ requestWrite_args.thrift_spec = (
 
 
 class requestWrite_result(object):
-    """
-    Attributes:
-     - success
-    """
 
-
-    def __init__(self, success=None,):
-        self.success = success
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -636,11 +806,6 @@ class requestWrite_result(object):
             (fname, ftype, fid) = iprot.readFieldBegin()
             if ftype == TType.STOP:
                 break
-            if fid == 0:
-                if ftype == TType.BOOL:
-                    self.success = iprot.readBool()
-                else:
-                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -651,10 +816,6 @@ class requestWrite_result(object):
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
         oprot.writeStructBegin('requestWrite_result')
-        if self.success is not None:
-            oprot.writeFieldBegin('success', TType.BOOL, 0)
-            oprot.writeBool(self.success)
-            oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
 
@@ -673,7 +834,6 @@ class requestWrite_result(object):
         return not (self == other)
 all_structs.append(requestWrite_result)
 requestWrite_result.thrift_spec = (
-    (0, TType.BOOL, 'success', None, None, ),  # 0
 )
 
 

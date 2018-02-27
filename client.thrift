@@ -1,7 +1,8 @@
 service Client {
     # master
-    bool addConnection(1: i32 id);
+    void setID(1: i32 id);
+    bool addConnection(1: i32 id, 2: i32 port);
     bool removeConnection(1: i32 id);
-    bool requestWrite(1: string key, 2: string value);
+    void requestWrite(1: string key, 2: string value);
     string requestRead(1: string key);
 }

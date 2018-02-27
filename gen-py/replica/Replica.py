@@ -19,10 +19,18 @@ all_structs = []
 
 
 class Iface(object):
-    def addConnection(self, id):
+    def setID(self, id):
         """
         Parameters:
          - id
+        """
+        pass
+
+    def addConnection(self, id, port):
+        """
+        Parameters:
+         - id
+         - port
         """
         pass
 
@@ -36,20 +44,32 @@ class Iface(object):
     def getStore(self):
         pass
 
-    def write(self, key, value, version):
+    def write(self, key, value, cid, version):
         """
         Parameters:
          - key
          - value
+         - cid
          - version
         """
         pass
 
-    def read(self, key, version):
+    def read(self, key, cid, version):
         """
         Parameters:
          - key
+         - cid
          - version
+        """
+        pass
+
+    def gossip(self, key, value, breadcrumbs, seen):
+        """
+        Parameters:
+         - key
+         - value
+         - breadcrumbs
+         - seen
         """
         pass
 
@@ -61,18 +81,49 @@ class Client(Iface):
             self._oprot = oprot
         self._seqid = 0
 
-    def addConnection(self, id):
+    def setID(self, id):
         """
         Parameters:
          - id
         """
-        self.send_addConnection(id)
+        self.send_setID(id)
+        self.recv_setID()
+
+    def send_setID(self, id):
+        self._oprot.writeMessageBegin('setID', TMessageType.CALL, self._seqid)
+        args = setID_args()
+        args.id = id
+        args.write(self._oprot)
+        self._oprot.writeMessageEnd()
+        self._oprot.trans.flush()
+
+    def recv_setID(self):
+        iprot = self._iprot
+        (fname, mtype, rseqid) = iprot.readMessageBegin()
+        if mtype == TMessageType.EXCEPTION:
+            x = TApplicationException()
+            x.read(iprot)
+            iprot.readMessageEnd()
+            raise x
+        result = setID_result()
+        result.read(iprot)
+        iprot.readMessageEnd()
+        return
+
+    def addConnection(self, id, port):
+        """
+        Parameters:
+         - id
+         - port
+        """
+        self.send_addConnection(id, port)
         return self.recv_addConnection()
 
-    def send_addConnection(self, id):
+    def send_addConnection(self, id, port):
         self._oprot.writeMessageBegin('addConnection', TMessageType.CALL, self._seqid)
         args = addConnection_args()
         args.id = id
+        args.port = port
         args.write(self._oprot)
         self._oprot.writeMessageEnd()
         self._oprot.trans.flush()
@@ -149,21 +200,23 @@ class Client(Iface):
             return result.success
         raise TApplicationException(TApplicationException.MISSING_RESULT, "getStore failed: unknown result")
 
-    def write(self, key, value, version):
+    def write(self, key, value, cid, version):
         """
         Parameters:
          - key
          - value
+         - cid
          - version
         """
-        self.send_write(key, value, version)
-        return self.recv_write()
+        self.send_write(key, value, cid, version)
+        self.recv_write()
 
-    def send_write(self, key, value, version):
+    def send_write(self, key, value, cid, version):
         self._oprot.writeMessageBegin('write', TMessageType.CALL, self._seqid)
         args = write_args()
         args.key = key
         args.value = value
+        args.cid = cid
         args.version = version
         args.write(self._oprot)
         self._oprot.writeMessageEnd()
@@ -180,23 +233,23 @@ class Client(Iface):
         result = write_result()
         result.read(iprot)
         iprot.readMessageEnd()
-        if result.success is not None:
-            return result.success
-        raise TApplicationException(TApplicationException.MISSING_RESULT, "write failed: unknown result")
+        return
 
-    def read(self, key, version):
+    def read(self, key, cid, version):
         """
         Parameters:
          - key
+         - cid
          - version
         """
-        self.send_read(key, version)
+        self.send_read(key, cid, version)
         return self.recv_read()
 
-    def send_read(self, key, version):
+    def send_read(self, key, cid, version):
         self._oprot.writeMessageBegin('read', TMessageType.CALL, self._seqid)
         args = read_args()
         args.key = key
+        args.cid = cid
         args.version = version
         args.write(self._oprot)
         self._oprot.writeMessageEnd()
@@ -217,16 +270,53 @@ class Client(Iface):
             return result.success
         raise TApplicationException(TApplicationException.MISSING_RESULT, "read failed: unknown result")
 
+    def gossip(self, key, value, breadcrumbs, seen):
+        """
+        Parameters:
+         - key
+         - value
+         - breadcrumbs
+         - seen
+        """
+        self.send_gossip(key, value, breadcrumbs, seen)
+        self.recv_gossip()
+
+    def send_gossip(self, key, value, breadcrumbs, seen):
+        self._oprot.writeMessageBegin('gossip', TMessageType.CALL, self._seqid)
+        args = gossip_args()
+        args.key = key
+        args.value = value
+        args.breadcrumbs = breadcrumbs
+        args.seen = seen
+        args.write(self._oprot)
+        self._oprot.writeMessageEnd()
+        self._oprot.trans.flush()
+
+    def recv_gossip(self):
+        iprot = self._iprot
+        (fname, mtype, rseqid) = iprot.readMessageBegin()
+        if mtype == TMessageType.EXCEPTION:
+            x = TApplicationException()
+            x.read(iprot)
+            iprot.readMessageEnd()
+            raise x
+        result = gossip_result()
+        result.read(iprot)
+        iprot.readMessageEnd()
+        return
+
 
 class Processor(Iface, TProcessor):
     def __init__(self, handler):
         self._handler = handler
         self._processMap = {}
+        self._processMap["setID"] = Processor.process_setID
         self._processMap["addConnection"] = Processor.process_addConnection
         self._processMap["removeConnection"] = Processor.process_removeConnection
         self._processMap["getStore"] = Processor.process_getStore
         self._processMap["write"] = Processor.process_write
         self._processMap["read"] = Processor.process_read
+        self._processMap["gossip"] = Processor.process_gossip
 
     def process(self, iprot, oprot):
         (name, type, seqid) = iprot.readMessageBegin()
@@ -243,13 +333,36 @@ class Processor(Iface, TProcessor):
             self._processMap[name](self, seqid, iprot, oprot)
         return True
 
+    def process_setID(self, seqid, iprot, oprot):
+        args = setID_args()
+        args.read(iprot)
+        iprot.readMessageEnd()
+        result = setID_result()
+        try:
+            self._handler.setID(args.id)
+            msg_type = TMessageType.REPLY
+        except TTransport.TTransportException:
+            raise
+        except TApplicationException as ex:
+            logging.exception('TApplication exception in handler')
+            msg_type = TMessageType.EXCEPTION
+            result = ex
+        except Exception:
+            logging.exception('Unexpected exception in handler')
+            msg_type = TMessageType.EXCEPTION
+            result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
+        oprot.writeMessageBegin("setID", msg_type, seqid)
+        result.write(oprot)
+        oprot.writeMessageEnd()
+        oprot.trans.flush()
+
     def process_addConnection(self, seqid, iprot, oprot):
         args = addConnection_args()
         args.read(iprot)
         iprot.readMessageEnd()
         result = addConnection_result()
         try:
-            result.success = self._handler.addConnection(args.id)
+            result.success = self._handler.addConnection(args.id, args.port)
             msg_type = TMessageType.REPLY
         except TTransport.TTransportException:
             raise
@@ -318,7 +431,7 @@ class Processor(Iface, TProcessor):
         iprot.readMessageEnd()
         result = write_result()
         try:
-            result.success = self._handler.write(args.key, args.value, args.version)
+            self._handler.write(args.key, args.value, args.cid, args.version)
             msg_type = TMessageType.REPLY
         except TTransport.TTransportException:
             raise
@@ -341,7 +454,7 @@ class Processor(Iface, TProcessor):
         iprot.readMessageEnd()
         result = read_result()
         try:
-            result.success = self._handler.read(args.key, args.version)
+            result.success = self._handler.read(args.key, args.cid, args.version)
             msg_type = TMessageType.REPLY
         except TTransport.TTransportException:
             raise
@@ -358,10 +471,33 @@ class Processor(Iface, TProcessor):
         oprot.writeMessageEnd()
         oprot.trans.flush()
 
+    def process_gossip(self, seqid, iprot, oprot):
+        args = gossip_args()
+        args.read(iprot)
+        iprot.readMessageEnd()
+        result = gossip_result()
+        try:
+            self._handler.gossip(args.key, args.value, args.breadcrumbs, args.seen)
+            msg_type = TMessageType.REPLY
+        except TTransport.TTransportException:
+            raise
+        except TApplicationException as ex:
+            logging.exception('TApplication exception in handler')
+            msg_type = TMessageType.EXCEPTION
+            result = ex
+        except Exception:
+            logging.exception('Unexpected exception in handler')
+            msg_type = TMessageType.EXCEPTION
+            result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
+        oprot.writeMessageBegin("gossip", msg_type, seqid)
+        result.write(oprot)
+        oprot.writeMessageEnd()
+        oprot.trans.flush()
+
 # HELPER FUNCTIONS AND STRUCTURES
 
 
-class addConnection_args(object):
+class setID_args(object):
     """
     Attributes:
      - id
@@ -394,10 +530,125 @@ class addConnection_args(object):
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
+        oprot.writeStructBegin('setID_args')
+        if self.id is not None:
+            oprot.writeFieldBegin('id', TType.I32, 1)
+            oprot.writeI32(self.id)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+all_structs.append(setID_args)
+setID_args.thrift_spec = (
+    None,  # 0
+    (1, TType.I32, 'id', None, None, ),  # 1
+)
+
+
+class setID_result(object):
+
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('setID_result')
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+all_structs.append(setID_result)
+setID_result.thrift_spec = (
+)
+
+
+class addConnection_args(object):
+    """
+    Attributes:
+     - id
+     - port
+    """
+
+
+    def __init__(self, id=None, port=None,):
+        self.id = id
+        self.port = port
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I32:
+                    self.id = iprot.readI32()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.I32:
+                    self.port = iprot.readI32()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
         oprot.writeStructBegin('addConnection_args')
         if self.id is not None:
             oprot.writeFieldBegin('id', TType.I32, 1)
             oprot.writeI32(self.id)
+            oprot.writeFieldEnd()
+        if self.port is not None:
+            oprot.writeFieldBegin('port', TType.I32, 2)
+            oprot.writeI32(self.port)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -419,6 +670,7 @@ all_structs.append(addConnection_args)
 addConnection_args.thrift_spec = (
     None,  # 0
     (1, TType.I32, 'id', None, None, ),  # 1
+    (2, TType.I32, 'port', None, None, ),  # 2
 )
 
 
@@ -721,13 +973,15 @@ class write_args(object):
     Attributes:
      - key
      - value
+     - cid
      - version
     """
 
 
-    def __init__(self, key=None, value=None, version=None,):
+    def __init__(self, key=None, value=None, cid=None, version=None,):
         self.key = key
         self.value = value
+        self.cid = cid
         self.version = version
 
     def read(self, iprot):
@@ -751,6 +1005,11 @@ class write_args(object):
                     iprot.skip(ftype)
             elif fid == 3:
                 if ftype == TType.I32:
+                    self.cid = iprot.readI32()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 4:
+                if ftype == TType.I32:
                     self.version = iprot.readI32()
                 else:
                     iprot.skip(ftype)
@@ -772,8 +1031,12 @@ class write_args(object):
             oprot.writeFieldBegin('value', TType.STRING, 2)
             oprot.writeString(self.value.encode('utf-8') if sys.version_info[0] == 2 else self.value)
             oprot.writeFieldEnd()
+        if self.cid is not None:
+            oprot.writeFieldBegin('cid', TType.I32, 3)
+            oprot.writeI32(self.cid)
+            oprot.writeFieldEnd()
         if self.version is not None:
-            oprot.writeFieldBegin('version', TType.I32, 3)
+            oprot.writeFieldBegin('version', TType.I32, 4)
             oprot.writeI32(self.version)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
@@ -797,19 +1060,13 @@ write_args.thrift_spec = (
     None,  # 0
     (1, TType.STRING, 'key', 'UTF8', None, ),  # 1
     (2, TType.STRING, 'value', 'UTF8', None, ),  # 2
-    (3, TType.I32, 'version', None, None, ),  # 3
+    (3, TType.I32, 'cid', None, None, ),  # 3
+    (4, TType.I32, 'version', None, None, ),  # 4
 )
 
 
 class write_result(object):
-    """
-    Attributes:
-     - success
-    """
 
-
-    def __init__(self, success=None,):
-        self.success = success
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -820,11 +1077,6 @@ class write_result(object):
             (fname, ftype, fid) = iprot.readFieldBegin()
             if ftype == TType.STOP:
                 break
-            if fid == 0:
-                if ftype == TType.BOOL:
-                    self.success = iprot.readBool()
-                else:
-                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -835,10 +1087,6 @@ class write_result(object):
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
         oprot.writeStructBegin('write_result')
-        if self.success is not None:
-            oprot.writeFieldBegin('success', TType.BOOL, 0)
-            oprot.writeBool(self.success)
-            oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
 
@@ -857,7 +1105,6 @@ class write_result(object):
         return not (self == other)
 all_structs.append(write_result)
 write_result.thrift_spec = (
-    (0, TType.BOOL, 'success', None, None, ),  # 0
 )
 
 
@@ -865,12 +1112,14 @@ class read_args(object):
     """
     Attributes:
      - key
+     - cid
      - version
     """
 
 
-    def __init__(self, key=None, version=None,):
+    def __init__(self, key=None, cid=None, version=None,):
         self.key = key
+        self.cid = cid
         self.version = version
 
     def read(self, iprot):
@@ -889,6 +1138,11 @@ class read_args(object):
                     iprot.skip(ftype)
             elif fid == 2:
                 if ftype == TType.I32:
+                    self.cid = iprot.readI32()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.I32:
                     self.version = iprot.readI32()
                 else:
                     iprot.skip(ftype)
@@ -906,8 +1160,12 @@ class read_args(object):
             oprot.writeFieldBegin('key', TType.STRING, 1)
             oprot.writeString(self.key.encode('utf-8') if sys.version_info[0] == 2 else self.key)
             oprot.writeFieldEnd()
+        if self.cid is not None:
+            oprot.writeFieldBegin('cid', TType.I32, 2)
+            oprot.writeI32(self.cid)
+            oprot.writeFieldEnd()
         if self.version is not None:
-            oprot.writeFieldBegin('version', TType.I32, 2)
+            oprot.writeFieldBegin('version', TType.I32, 3)
             oprot.writeI32(self.version)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
@@ -930,7 +1188,8 @@ all_structs.append(read_args)
 read_args.thrift_spec = (
     None,  # 0
     (1, TType.STRING, 'key', 'UTF8', None, ),  # 1
-    (2, TType.I32, 'version', None, None, ),  # 2
+    (2, TType.I32, 'cid', None, None, ),  # 2
+    (3, TType.I32, 'version', None, None, ),  # 3
 )
 
 
@@ -954,8 +1213,9 @@ class read_result(object):
             if ftype == TType.STOP:
                 break
             if fid == 0:
-                if ftype == TType.STRING:
-                    self.success = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                if ftype == TType.STRUCT:
+                    self.success = ReadResult()
+                    self.success.read(iprot)
                 else:
                     iprot.skip(ftype)
             else:
@@ -969,8 +1229,8 @@ class read_result(object):
             return
         oprot.writeStructBegin('read_result')
         if self.success is not None:
-            oprot.writeFieldBegin('success', TType.STRING, 0)
-            oprot.writeString(self.success.encode('utf-8') if sys.version_info[0] == 2 else self.success)
+            oprot.writeFieldBegin('success', TType.STRUCT, 0)
+            self.success.write(oprot)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -990,7 +1250,165 @@ class read_result(object):
         return not (self == other)
 all_structs.append(read_result)
 read_result.thrift_spec = (
-    (0, TType.STRING, 'success', 'UTF8', None, ),  # 0
+    (0, TType.STRUCT, 'success', [ReadResult, None], None, ),  # 0
+)
+
+
+class gossip_args(object):
+    """
+    Attributes:
+     - key
+     - value
+     - breadcrumbs
+     - seen
+    """
+
+
+    def __init__(self, key=None, value=None, breadcrumbs=None, seen=None,):
+        self.key = key
+        self.value = value
+        self.breadcrumbs = breadcrumbs
+        self.seen = seen
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.STRING:
+                    self.key = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.value = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.MAP:
+                    self.breadcrumbs = {}
+                    (_ktype10, _vtype11, _size9) = iprot.readMapBegin()
+                    for _i13 in range(_size9):
+                        _key14 = iprot.readI32()
+                        _val15 = iprot.readI32()
+                        self.breadcrumbs[_key14] = _val15
+                    iprot.readMapEnd()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 4:
+                if ftype == TType.SET:
+                    self.seen = set()
+                    (_etype19, _size16) = iprot.readSetBegin()
+                    for _i20 in range(_size16):
+                        _elem21 = iprot.readI32()
+                        self.seen.add(_elem21)
+                    iprot.readSetEnd()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('gossip_args')
+        if self.key is not None:
+            oprot.writeFieldBegin('key', TType.STRING, 1)
+            oprot.writeString(self.key.encode('utf-8') if sys.version_info[0] == 2 else self.key)
+            oprot.writeFieldEnd()
+        if self.value is not None:
+            oprot.writeFieldBegin('value', TType.STRING, 2)
+            oprot.writeString(self.value.encode('utf-8') if sys.version_info[0] == 2 else self.value)
+            oprot.writeFieldEnd()
+        if self.breadcrumbs is not None:
+            oprot.writeFieldBegin('breadcrumbs', TType.MAP, 3)
+            oprot.writeMapBegin(TType.I32, TType.I32, len(self.breadcrumbs))
+            for kiter22, viter23 in self.breadcrumbs.items():
+                oprot.writeI32(kiter22)
+                oprot.writeI32(viter23)
+            oprot.writeMapEnd()
+            oprot.writeFieldEnd()
+        if self.seen is not None:
+            oprot.writeFieldBegin('seen', TType.SET, 4)
+            oprot.writeSetBegin(TType.I32, len(self.seen))
+            for iter24 in self.seen:
+                oprot.writeI32(iter24)
+            oprot.writeSetEnd()
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+all_structs.append(gossip_args)
+gossip_args.thrift_spec = (
+    None,  # 0
+    (1, TType.STRING, 'key', 'UTF8', None, ),  # 1
+    (2, TType.STRING, 'value', 'UTF8', None, ),  # 2
+    (3, TType.MAP, 'breadcrumbs', (TType.I32, None, TType.I32, None, False), None, ),  # 3
+    (4, TType.SET, 'seen', (TType.I32, None, False), None, ),  # 4
+)
+
+
+class gossip_result(object):
+
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('gossip_result')
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+all_structs.append(gossip_result)
+gossip_result.thrift_spec = (
 )
 fix_spec(all_structs)
 del all_structs

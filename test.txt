@@ -1,4 +1,6 @@
 joinServer 0
 joinServer 1
-joinServer 2
-printStore 1
+joinClient 3 0
+put 3 000 111
+put 3 111 000
+printStore 0
