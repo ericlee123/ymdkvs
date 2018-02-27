@@ -3,7 +3,6 @@ import sys
 
 # thrift stuff
 sys.path.append('gen-py')
-from client import Client
 from replica import Replica
 from replica.ttypes import ReadResult
 from thrift.transport import TSocket
@@ -55,7 +54,6 @@ class ClientHandler:
         self.transports[rid].open()
         self.stubs[rid].write(key, value, self.id, version)
         self.transports[rid].close()
-
 
     def requestRead(self, key):
         rid = random.sample(self.reachable, 1)[0]

@@ -63,14 +63,14 @@ class Iface(object):
         """
         pass
 
-    def gossip(self, key, value, version, seen, cid):
+    def listen(self, key, value, version, cid, seen):
         """
         Parameters:
          - key
          - value
          - version
-         - seen
          - cid
+         - seen
         """
         pass
 
@@ -271,31 +271,31 @@ class Client(Iface):
             return result.success
         raise TApplicationException(TApplicationException.MISSING_RESULT, "read failed: unknown result")
 
-    def gossip(self, key, value, version, seen, cid):
+    def listen(self, key, value, version, cid, seen):
         """
         Parameters:
          - key
          - value
          - version
-         - seen
          - cid
+         - seen
         """
-        self.send_gossip(key, value, version, seen, cid)
-        self.recv_gossip()
+        self.send_listen(key, value, version, cid, seen)
+        self.recv_listen()
 
-    def send_gossip(self, key, value, version, seen, cid):
-        self._oprot.writeMessageBegin('gossip', TMessageType.CALL, self._seqid)
-        args = gossip_args()
+    def send_listen(self, key, value, version, cid, seen):
+        self._oprot.writeMessageBegin('listen', TMessageType.CALL, self._seqid)
+        args = listen_args()
         args.key = key
         args.value = value
         args.version = version
-        args.seen = seen
         args.cid = cid
+        args.seen = seen
         args.write(self._oprot)
         self._oprot.writeMessageEnd()
         self._oprot.trans.flush()
 
-    def recv_gossip(self):
+    def recv_listen(self):
         iprot = self._iprot
         (fname, mtype, rseqid) = iprot.readMessageBegin()
         if mtype == TMessageType.EXCEPTION:
@@ -303,7 +303,7 @@ class Client(Iface):
             x.read(iprot)
             iprot.readMessageEnd()
             raise x
-        result = gossip_result()
+        result = listen_result()
         result.read(iprot)
         iprot.readMessageEnd()
         return
@@ -319,7 +319,7 @@ class Processor(Iface, TProcessor):
         self._processMap["getStore"] = Processor.process_getStore
         self._processMap["write"] = Processor.process_write
         self._processMap["read"] = Processor.process_read
-        self._processMap["gossip"] = Processor.process_gossip
+        self._processMap["listen"] = Processor.process_listen
 
     def process(self, iprot, oprot):
         (name, type, seqid) = iprot.readMessageBegin()
@@ -474,13 +474,13 @@ class Processor(Iface, TProcessor):
         oprot.writeMessageEnd()
         oprot.trans.flush()
 
-    def process_gossip(self, seqid, iprot, oprot):
-        args = gossip_args()
+    def process_listen(self, seqid, iprot, oprot):
+        args = listen_args()
         args.read(iprot)
         iprot.readMessageEnd()
-        result = gossip_result()
+        result = listen_result()
         try:
-            self._handler.gossip(args.key, args.value, args.version, args.seen, args.cid)
+            self._handler.listen(args.key, args.value, args.version, args.cid, args.seen)
             msg_type = TMessageType.REPLY
         except TTransport.TTransportException:
             raise
@@ -492,7 +492,7 @@ class Processor(Iface, TProcessor):
             logging.exception('Unexpected exception in handler')
             msg_type = TMessageType.EXCEPTION
             result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
-        oprot.writeMessageBegin("gossip", msg_type, seqid)
+        oprot.writeMessageBegin("listen", msg_type, seqid)
         result.write(oprot)
         oprot.writeMessageEnd()
         oprot.trans.flush()
@@ -1257,23 +1257,23 @@ read_result.thrift_spec = (
 )
 
 
-class gossip_args(object):
+class listen_args(object):
     """
     Attributes:
      - key
      - value
      - version
-     - seen
      - cid
+     - seen
     """
 
 
-    def __init__(self, key=None, value=None, version=None, seen=None, cid=None,):
+    def __init__(self, key=None, value=None, version=None, cid=None, seen=None,):
         self.key = key
         self.value = value
         self.version = version
-        self.seen = seen
         self.cid = cid
+        self.seen = seen
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -1300,6 +1300,11 @@ class gossip_args(object):
                 else:
                     iprot.skip(ftype)
             elif fid == 4:
+                if ftype == TType.I32:
+                    self.cid = iprot.readI32()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 5:
                 if ftype == TType.SET:
                     self.seen = set()
                     (_etype12, _size9) = iprot.readSetBegin()
@@ -1307,11 +1312,6 @@ class gossip_args(object):
                         _elem14 = iprot.readI32()
                         self.seen.add(_elem14)
                     iprot.readSetEnd()
-                else:
-                    iprot.skip(ftype)
-            elif fid == 5:
-                if ftype == TType.I32:
-                    self.cid = iprot.readI32()
                 else:
                     iprot.skip(ftype)
             else:
@@ -1323,7 +1323,7 @@ class gossip_args(object):
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
-        oprot.writeStructBegin('gossip_args')
+        oprot.writeStructBegin('listen_args')
         if self.key is not None:
             oprot.writeFieldBegin('key', TType.STRING, 1)
             oprot.writeString(self.key.encode('utf-8') if sys.version_info[0] == 2 else self.key)
@@ -1336,16 +1336,16 @@ class gossip_args(object):
             oprot.writeFieldBegin('version', TType.I32, 3)
             oprot.writeI32(self.version)
             oprot.writeFieldEnd()
+        if self.cid is not None:
+            oprot.writeFieldBegin('cid', TType.I32, 4)
+            oprot.writeI32(self.cid)
+            oprot.writeFieldEnd()
         if self.seen is not None:
-            oprot.writeFieldBegin('seen', TType.SET, 4)
+            oprot.writeFieldBegin('seen', TType.SET, 5)
             oprot.writeSetBegin(TType.I32, len(self.seen))
             for iter15 in self.seen:
                 oprot.writeI32(iter15)
             oprot.writeSetEnd()
-            oprot.writeFieldEnd()
-        if self.cid is not None:
-            oprot.writeFieldBegin('cid', TType.I32, 5)
-            oprot.writeI32(self.cid)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -1363,18 +1363,18 @@ class gossip_args(object):
 
     def __ne__(self, other):
         return not (self == other)
-all_structs.append(gossip_args)
-gossip_args.thrift_spec = (
+all_structs.append(listen_args)
+listen_args.thrift_spec = (
     None,  # 0
     (1, TType.STRING, 'key', 'UTF8', None, ),  # 1
     (2, TType.STRING, 'value', 'UTF8', None, ),  # 2
     (3, TType.I32, 'version', None, None, ),  # 3
-    (4, TType.SET, 'seen', (TType.I32, None, False), None, ),  # 4
-    (5, TType.I32, 'cid', None, None, ),  # 5
+    (4, TType.I32, 'cid', None, None, ),  # 4
+    (5, TType.SET, 'seen', (TType.I32, None, False), None, ),  # 5
 )
 
 
-class gossip_result(object):
+class listen_result(object):
 
 
     def read(self, iprot):
@@ -1395,7 +1395,7 @@ class gossip_result(object):
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
-        oprot.writeStructBegin('gossip_result')
+        oprot.writeStructBegin('listen_result')
         oprot.writeFieldStop()
         oprot.writeStructEnd()
 
@@ -1412,8 +1412,8 @@ class gossip_result(object):
 
     def __ne__(self, other):
         return not (self == other)
-all_structs.append(gossip_result)
-gossip_result.thrift_spec = (
+all_structs.append(listen_result)
+listen_result.thrift_spec = (
 )
 fix_spec(all_structs)
 del all_structs

@@ -15,5 +15,9 @@ service Replica {
     ReadResult read(1: string key, 2: i32 cid, 3: i32 version);
 
     # replica
-    void gossip(1: string key, 2: string value, 3: i32 version, 4: set<i32> seen, 5: i32 cid);
+    void listen(1: string key,
+                2: string value,
+                3: i32 version,
+                4: i32 cid,
+                5: set<i32> seen);
 }

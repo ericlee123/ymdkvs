@@ -42,6 +42,7 @@ class Master:
         self.replicas = set()
         self.stubs = dict() # id -> stub
         self.transports = dict()
+        self.wait = 0.05
 
     def listen(self):
         for cmd in sys.stdin:
@@ -80,7 +81,7 @@ class Master:
         p = Process(target=spinUpServer, args=(self.openPort,))
         p.start()
 
-        time.sleep(0.1) # wait for server.serve() [messy]
+        time.sleep(self.wait) # wait for server.serve() [messy]
 
         # set up RPC to replica server
         transport = TSocket.TSocket('localhost', self.openPort)
@@ -116,7 +117,7 @@ class Master:
         p = Process(target=spinUpClient, args=(self.openPort,))
         p.start()
 
-        time.sleep(0.1) # wait for server.serve() [messy]
+        time.sleep(self.wait) # wait for server.serve() [messy]
 
         # set up RPC to client server
         transport = TSocket.TSocket('localhost', self.openPort)
@@ -140,6 +141,7 @@ class Master:
         self.stubs[id2].removeConnection(id1)
 
     def createConnection(self, id1, id2):
+        # TODO: include ports in arguments
         self.stubs[id1].addConnection(id2)
         self.stubs[id2].addConnection(id1)
 
@@ -148,8 +150,12 @@ class Master:
         while True:
             store = None
             match = True
+            print "==================================="
             for r in self.replicas:
+                print "opening"
                 self.transports[r].open()
+                print "opened"
+                print self.stubs[r].getStore()
                 if store is None:
                     store = self.stubs[r].getStore()
                 elif store != self.stubs[r].getStore():
@@ -158,6 +164,7 @@ class Master:
                     break
                 self.transports[r].close()
             if match:
+                print "MATCHA"
                 return
 
     def printStore(self, id):

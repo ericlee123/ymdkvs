@@ -20,7 +20,6 @@ class ReplicaHandler:
         self.reachable = set()
         self.stubs = dict()
         self.transports = dict() # id -> (transport, lock)
-        self.ts = 0
 
     def setID(self, id):
         self.id = id
@@ -62,7 +61,7 @@ class ReplicaHandler:
         else:
             self.kv_store[key] = (value, {cid: version})
         seen = {self.id}
-        thread.start_new_thread(self.gossip, (key, value, version, seen, cid))
+        thread.start_new_thread(self.process, (key, value, version, cid, seen))
 
     def read(self, key, cid, version):
         if key not in self.kv_store:
@@ -86,13 +85,16 @@ class ReplicaHandler:
             rr.version = -1
             return rr
 
-    def gossip(self, key, value, version, seen, cid):
+    def listen(self, key, value, version, cid, seen):
+        thread.start_new_thread(self.process, (key, value, version, cid, seen))
+
+    def process(self, key, value, version, cid, seen):
         if key not in self.kv_store:
             self.kv_store[key] = (value, {cid: version})
             seen.add(self.id)
         else:
             my_value, my_breadcrumbs = self.kv_store[key]
-            if version >= my_breadcrumbs[cid]: # gossip more up-to-date
+            if version >= my_breadcrumbs.get(cid, 0): # gossip more up-to-date
                 my_breadcrumbs[cid] = version
                 self.kv_store[key] = (value, my_breadcrumbs)
                 seen.add(self.id)
@@ -103,12 +105,12 @@ class ReplicaHandler:
 
         # TODO: make this multithreaded
         for r in self.reachable.difference(seen):
-            thread.start_new_thread(self.sendGossip, (key, value, version, seen, r, cid))
+            self.gossip(key, value, version, cid, seen, r)
 
-    def sendGossip(self, key, value, version, seen, rid, cid):
+    def gossip(self, key, value, version, cid, seen, rid):
         transport, lock = self.transports[rid]
         lock.acquire(True)
         transport.open()
-        self.stubs[rid].gossip(key, value, version, seen, cid)
+        self.stubs[rid].listen(key, value, version, cid, seen)
         transport.close()
         lock.release()
