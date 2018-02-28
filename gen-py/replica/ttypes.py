@@ -81,11 +81,118 @@ class ReadResult(object):
 
     def __ne__(self, other):
         return not (self == other)
+
+
+class Bread(object):
+    """
+    Attributes:
+     - value
+     - kv_ts
+     - rid
+     - crumbs
+    """
+
+
+    def __init__(self, value=None, kv_ts=None, rid=None, crumbs=None,):
+        self.value = value
+        self.kv_ts = kv_ts
+        self.rid = rid
+        self.crumbs = crumbs
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.STRING:
+                    self.value = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.I32:
+                    self.kv_ts = iprot.readI32()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.I32:
+                    self.rid = iprot.readI32()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 4:
+                if ftype == TType.MAP:
+                    self.crumbs = {}
+                    (_ktype1, _vtype2, _size0) = iprot.readMapBegin()
+                    for _i4 in range(_size0):
+                        _key5 = iprot.readI32()
+                        _val6 = iprot.readI32()
+                        self.crumbs[_key5] = _val6
+                    iprot.readMapEnd()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('Bread')
+        if self.value is not None:
+            oprot.writeFieldBegin('value', TType.STRING, 1)
+            oprot.writeString(self.value.encode('utf-8') if sys.version_info[0] == 2 else self.value)
+            oprot.writeFieldEnd()
+        if self.kv_ts is not None:
+            oprot.writeFieldBegin('kv_ts', TType.I32, 2)
+            oprot.writeI32(self.kv_ts)
+            oprot.writeFieldEnd()
+        if self.rid is not None:
+            oprot.writeFieldBegin('rid', TType.I32, 3)
+            oprot.writeI32(self.rid)
+            oprot.writeFieldEnd()
+        if self.crumbs is not None:
+            oprot.writeFieldBegin('crumbs', TType.MAP, 4)
+            oprot.writeMapBegin(TType.I32, TType.I32, len(self.crumbs))
+            for kiter7, viter8 in self.crumbs.items():
+                oprot.writeI32(kiter7)
+                oprot.writeI32(viter8)
+            oprot.writeMapEnd()
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
 all_structs.append(ReadResult)
 ReadResult.thrift_spec = (
     None,  # 0
     (1, TType.STRING, 'value', 'UTF8', None, ),  # 1
     (2, TType.I32, 'version', None, None, ),  # 2
+)
+all_structs.append(Bread)
+Bread.thrift_spec = (
+    None,  # 0
+    (1, TType.STRING, 'value', 'UTF8', None, ),  # 1
+    (2, TType.I32, 'kv_ts', None, None, ),  # 2
+    (3, TType.I32, 'rid', None, None, ),  # 3
+    (4, TType.MAP, 'crumbs', (TType.I32, None, TType.I32, None, False), None, ),  # 4
 )
 fix_spec(all_structs)
 del all_structs

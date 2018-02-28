@@ -137,13 +137,21 @@ class Master:
         self.openPort += 1
 
     def breakConnection(self, id1, id2):
+        self.transports[id1].open()
+        self.transports[id2].open()
         self.stubs[id1].removeConnection(id2)
         self.stubs[id2].removeConnection(id1)
+        self.transports[id1].close()
+        self.transports[id2].close()
 
     def createConnection(self, id1, id2):
         # TODO: include ports in arguments
-        self.stubs[id1].addConnection(id2)
-        self.stubs[id2].addConnection(id1)
+        self.transports[id1].open()
+        self.transports[id2].open()
+        self.stubs[id1].addConnection(id2, self.ports[id2])
+        self.stubs[id2].addConnection(id1, self.ports[id1])
+        self.transports[id1].close()
+        self.transports[id2].close()
 
     def stabilize(self):
         # TODO: within all connected components, wait for all stores to converge
@@ -152,6 +160,7 @@ class Master:
             match = True
             for r in self.replicas:
                 self.transports[r].open()
+                print "r: " + str(r) + " " + str(self.stubs[r].getStore())
                 if store is None:
                     store = self.stubs[r].getStore()
                 elif store != self.stubs[r].getStore():

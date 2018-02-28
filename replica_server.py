@@ -15,11 +15,12 @@ class ReplicaHandler:
 
     def __init__(self):
         self.id = -1
-        self.kv_store = {} # key -> (value, [client -> version])
+        self.kv_store = {} # key -> (value, kv_ts, rid, [client -> version])
         self.num_servers = 0 # this should be initialized after talking to every other server
         self.reachable = set()
         self.stubs = dict()
         self.transports = dict() # id -> (transport, lock)
+        self.ts = 0
 
     def setID(self, id):
         self.id = id
@@ -53,16 +54,6 @@ class ReplicaHandler:
             bread[key] = value[0]
         return bread
 
-    def write(self, key, value, cid, version):
-        if key in self.kv_store:
-            breadcrumbs = self.kv_store[key][1]
-            breadcrumbs[cid] = version
-            self.kv_store[key] = (value, breadcrumbs)
-        else:
-            self.kv_store[key] = (value, {cid: version})
-        seen = {self.id}
-        thread.start_new_thread(self.process, (key, value, version, cid, seen))
-
     def read(self, key, cid, version):
         if key not in self.kv_store:
             rr = ReadResult()
@@ -84,6 +75,48 @@ class ReplicaHandler:
             rr.value = "ERR_DEP"
             rr.version = -1
             return rr
+
+    def write(self, key, value, cid, version):
+        breadcrumbs = {cid: version}
+        if key in self.kv_store:
+            breadcrumbs = self.kv_store[key][3]
+            breadcrumbs[cid] = version
+        self.kv_store[key] = (value, self.ts, self.id, breadcrumbs)
+        for r in self.reachable.difference({self.id}):
+            thread.start_new_thread(self.smallGossip,
+                (key, value, self.ts, self.id, cid, version, {self.id}, r))
+
+    def smallListen(self, key, value, kv_ts, rid, cid, version, seen, msg_ts):
+        self.ts = max(self.ts, msg_ts) + 1
+        thread.start_new_thread(self.smallProcess, (key, value, kv_ts, rid, cid, version, seen))
+
+    def smallProcess(self, key, value, kv_ts, rid, cid, version, seen):
+        if key not in self.kv_store:
+            self.kv_store[key] = (value, kv_ts, rid, {cid: version})
+            seen.add(self.id)
+            # TODO: send?
+            for r in self.reachable.difference(seen):
+                self.smallGossip(key, value, kv_ts, rid, cid, version, seen, r)
+        else:
+            my_value, my_ts, my_rid, my_versions = self.kv_store[key]
+            if kv_ts > my_ts or (kv_ts == my_ts and rid < my_rid): # more up-to-date
+                my_versions[cid] = version
+                self.kv_store[key] = (value, kv_ts, rid, my_versions)
+                seen.add(self.id)
+                for r in self.reachable.difference(seen):
+                    self.smallGossip(key, value, kv_ts, rid, cid, version, seen, r)
+            else: # I'm more up-to-date
+                pass
+
+    def smallGossip(self, key, value, kv_ts, rid, cid, version, seen, to):
+        transport, lock = self.transports[to]
+        lock.acquire(True)
+        transport.open()
+        self.stubs[to].smallListen(key, value, kv_ts, rid, cid, version, seen, self.ts)
+        self.ts += 1
+        transport.close()
+        lock.release()
+
 
     def listen(self, key, value, version, cid, seen):
         thread.start_new_thread(self.process, (key, value, version, cid, seen))

@@ -63,14 +63,26 @@ class Iface(object):
         """
         pass
 
-    def listen(self, key, value, version, cid, seen):
+    def smallListen(self, key, value, kv_ts, rid, cid, version, seen, msg_ts):
         """
         Parameters:
          - key
          - value
-         - version
+         - kv_ts
+         - rid
          - cid
+         - version
          - seen
+         - msg_ts
+        """
+        pass
+
+    def bigListen(self, loaf, seen, msg_ts):
+        """
+        Parameters:
+         - loaf
+         - seen
+         - msg_ts
         """
         pass
 
@@ -271,31 +283,37 @@ class Client(Iface):
             return result.success
         raise TApplicationException(TApplicationException.MISSING_RESULT, "read failed: unknown result")
 
-    def listen(self, key, value, version, cid, seen):
+    def smallListen(self, key, value, kv_ts, rid, cid, version, seen, msg_ts):
         """
         Parameters:
          - key
          - value
-         - version
+         - kv_ts
+         - rid
          - cid
+         - version
          - seen
+         - msg_ts
         """
-        self.send_listen(key, value, version, cid, seen)
-        self.recv_listen()
+        self.send_smallListen(key, value, kv_ts, rid, cid, version, seen, msg_ts)
+        self.recv_smallListen()
 
-    def send_listen(self, key, value, version, cid, seen):
-        self._oprot.writeMessageBegin('listen', TMessageType.CALL, self._seqid)
-        args = listen_args()
+    def send_smallListen(self, key, value, kv_ts, rid, cid, version, seen, msg_ts):
+        self._oprot.writeMessageBegin('smallListen', TMessageType.CALL, self._seqid)
+        args = smallListen_args()
         args.key = key
         args.value = value
-        args.version = version
+        args.kv_ts = kv_ts
+        args.rid = rid
         args.cid = cid
+        args.version = version
         args.seen = seen
+        args.msg_ts = msg_ts
         args.write(self._oprot)
         self._oprot.writeMessageEnd()
         self._oprot.trans.flush()
 
-    def recv_listen(self):
+    def recv_smallListen(self):
         iprot = self._iprot
         (fname, mtype, rseqid) = iprot.readMessageBegin()
         if mtype == TMessageType.EXCEPTION:
@@ -303,7 +321,40 @@ class Client(Iface):
             x.read(iprot)
             iprot.readMessageEnd()
             raise x
-        result = listen_result()
+        result = smallListen_result()
+        result.read(iprot)
+        iprot.readMessageEnd()
+        return
+
+    def bigListen(self, loaf, seen, msg_ts):
+        """
+        Parameters:
+         - loaf
+         - seen
+         - msg_ts
+        """
+        self.send_bigListen(loaf, seen, msg_ts)
+        self.recv_bigListen()
+
+    def send_bigListen(self, loaf, seen, msg_ts):
+        self._oprot.writeMessageBegin('bigListen', TMessageType.CALL, self._seqid)
+        args = bigListen_args()
+        args.loaf = loaf
+        args.seen = seen
+        args.msg_ts = msg_ts
+        args.write(self._oprot)
+        self._oprot.writeMessageEnd()
+        self._oprot.trans.flush()
+
+    def recv_bigListen(self):
+        iprot = self._iprot
+        (fname, mtype, rseqid) = iprot.readMessageBegin()
+        if mtype == TMessageType.EXCEPTION:
+            x = TApplicationException()
+            x.read(iprot)
+            iprot.readMessageEnd()
+            raise x
+        result = bigListen_result()
         result.read(iprot)
         iprot.readMessageEnd()
         return
@@ -319,7 +370,8 @@ class Processor(Iface, TProcessor):
         self._processMap["getStore"] = Processor.process_getStore
         self._processMap["write"] = Processor.process_write
         self._processMap["read"] = Processor.process_read
-        self._processMap["listen"] = Processor.process_listen
+        self._processMap["smallListen"] = Processor.process_smallListen
+        self._processMap["bigListen"] = Processor.process_bigListen
 
     def process(self, iprot, oprot):
         (name, type, seqid) = iprot.readMessageBegin()
@@ -474,13 +526,13 @@ class Processor(Iface, TProcessor):
         oprot.writeMessageEnd()
         oprot.trans.flush()
 
-    def process_listen(self, seqid, iprot, oprot):
-        args = listen_args()
+    def process_smallListen(self, seqid, iprot, oprot):
+        args = smallListen_args()
         args.read(iprot)
         iprot.readMessageEnd()
-        result = listen_result()
+        result = smallListen_result()
         try:
-            self._handler.listen(args.key, args.value, args.version, args.cid, args.seen)
+            self._handler.smallListen(args.key, args.value, args.kv_ts, args.rid, args.cid, args.version, args.seen, args.msg_ts)
             msg_type = TMessageType.REPLY
         except TTransport.TTransportException:
             raise
@@ -492,7 +544,30 @@ class Processor(Iface, TProcessor):
             logging.exception('Unexpected exception in handler')
             msg_type = TMessageType.EXCEPTION
             result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
-        oprot.writeMessageBegin("listen", msg_type, seqid)
+        oprot.writeMessageBegin("smallListen", msg_type, seqid)
+        result.write(oprot)
+        oprot.writeMessageEnd()
+        oprot.trans.flush()
+
+    def process_bigListen(self, seqid, iprot, oprot):
+        args = bigListen_args()
+        args.read(iprot)
+        iprot.readMessageEnd()
+        result = bigListen_result()
+        try:
+            self._handler.bigListen(args.loaf, args.seen, args.msg_ts)
+            msg_type = TMessageType.REPLY
+        except TTransport.TTransportException:
+            raise
+        except TApplicationException as ex:
+            logging.exception('TApplication exception in handler')
+            msg_type = TMessageType.EXCEPTION
+            result = ex
+        except Exception:
+            logging.exception('Unexpected exception in handler')
+            msg_type = TMessageType.EXCEPTION
+            result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
+        oprot.writeMessageBegin("bigListen", msg_type, seqid)
         result.write(oprot)
         oprot.writeMessageEnd()
         oprot.trans.flush()
@@ -923,11 +998,11 @@ class getStore_result(object):
             if fid == 0:
                 if ftype == TType.MAP:
                     self.success = {}
-                    (_ktype1, _vtype2, _size0) = iprot.readMapBegin()
-                    for _i4 in range(_size0):
-                        _key5 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
-                        _val6 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
-                        self.success[_key5] = _val6
+                    (_ktype10, _vtype11, _size9) = iprot.readMapBegin()
+                    for _i13 in range(_size9):
+                        _key14 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                        _val15 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                        self.success[_key14] = _val15
                     iprot.readMapEnd()
                 else:
                     iprot.skip(ftype)
@@ -944,9 +1019,9 @@ class getStore_result(object):
         if self.success is not None:
             oprot.writeFieldBegin('success', TType.MAP, 0)
             oprot.writeMapBegin(TType.STRING, TType.STRING, len(self.success))
-            for kiter7, viter8 in self.success.items():
-                oprot.writeString(kiter7.encode('utf-8') if sys.version_info[0] == 2 else kiter7)
-                oprot.writeString(viter8.encode('utf-8') if sys.version_info[0] == 2 else viter8)
+            for kiter16, viter17 in self.success.items():
+                oprot.writeString(kiter16.encode('utf-8') if sys.version_info[0] == 2 else kiter16)
+                oprot.writeString(viter17.encode('utf-8') if sys.version_info[0] == 2 else viter17)
             oprot.writeMapEnd()
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
@@ -1257,23 +1332,29 @@ read_result.thrift_spec = (
 )
 
 
-class listen_args(object):
+class smallListen_args(object):
     """
     Attributes:
      - key
      - value
-     - version
+     - kv_ts
+     - rid
      - cid
+     - version
      - seen
+     - msg_ts
     """
 
 
-    def __init__(self, key=None, value=None, version=None, cid=None, seen=None,):
+    def __init__(self, key=None, value=None, kv_ts=None, rid=None, cid=None, version=None, seen=None, msg_ts=None,):
         self.key = key
         self.value = value
-        self.version = version
+        self.kv_ts = kv_ts
+        self.rid = rid
         self.cid = cid
+        self.version = version
         self.seen = seen
+        self.msg_ts = msg_ts
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -1296,22 +1377,37 @@ class listen_args(object):
                     iprot.skip(ftype)
             elif fid == 3:
                 if ftype == TType.I32:
-                    self.version = iprot.readI32()
+                    self.kv_ts = iprot.readI32()
                 else:
                     iprot.skip(ftype)
             elif fid == 4:
                 if ftype == TType.I32:
-                    self.cid = iprot.readI32()
+                    self.rid = iprot.readI32()
                 else:
                     iprot.skip(ftype)
             elif fid == 5:
+                if ftype == TType.I32:
+                    self.cid = iprot.readI32()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 6:
+                if ftype == TType.I32:
+                    self.version = iprot.readI32()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 7:
                 if ftype == TType.SET:
                     self.seen = set()
-                    (_etype12, _size9) = iprot.readSetBegin()
-                    for _i13 in range(_size9):
-                        _elem14 = iprot.readI32()
-                        self.seen.add(_elem14)
+                    (_etype21, _size18) = iprot.readSetBegin()
+                    for _i22 in range(_size18):
+                        _elem23 = iprot.readI32()
+                        self.seen.add(_elem23)
                     iprot.readSetEnd()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 8:
+                if ftype == TType.I32:
+                    self.msg_ts = iprot.readI32()
                 else:
                     iprot.skip(ftype)
             else:
@@ -1323,7 +1419,7 @@ class listen_args(object):
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
-        oprot.writeStructBegin('listen_args')
+        oprot.writeStructBegin('smallListen_args')
         if self.key is not None:
             oprot.writeFieldBegin('key', TType.STRING, 1)
             oprot.writeString(self.key.encode('utf-8') if sys.version_info[0] == 2 else self.key)
@@ -1332,20 +1428,32 @@ class listen_args(object):
             oprot.writeFieldBegin('value', TType.STRING, 2)
             oprot.writeString(self.value.encode('utf-8') if sys.version_info[0] == 2 else self.value)
             oprot.writeFieldEnd()
-        if self.version is not None:
-            oprot.writeFieldBegin('version', TType.I32, 3)
-            oprot.writeI32(self.version)
+        if self.kv_ts is not None:
+            oprot.writeFieldBegin('kv_ts', TType.I32, 3)
+            oprot.writeI32(self.kv_ts)
+            oprot.writeFieldEnd()
+        if self.rid is not None:
+            oprot.writeFieldBegin('rid', TType.I32, 4)
+            oprot.writeI32(self.rid)
             oprot.writeFieldEnd()
         if self.cid is not None:
-            oprot.writeFieldBegin('cid', TType.I32, 4)
+            oprot.writeFieldBegin('cid', TType.I32, 5)
             oprot.writeI32(self.cid)
             oprot.writeFieldEnd()
+        if self.version is not None:
+            oprot.writeFieldBegin('version', TType.I32, 6)
+            oprot.writeI32(self.version)
+            oprot.writeFieldEnd()
         if self.seen is not None:
-            oprot.writeFieldBegin('seen', TType.SET, 5)
+            oprot.writeFieldBegin('seen', TType.SET, 7)
             oprot.writeSetBegin(TType.I32, len(self.seen))
-            for iter15 in self.seen:
-                oprot.writeI32(iter15)
+            for iter24 in self.seen:
+                oprot.writeI32(iter24)
             oprot.writeSetEnd()
+            oprot.writeFieldEnd()
+        if self.msg_ts is not None:
+            oprot.writeFieldBegin('msg_ts', TType.I32, 8)
+            oprot.writeI32(self.msg_ts)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -1363,18 +1471,21 @@ class listen_args(object):
 
     def __ne__(self, other):
         return not (self == other)
-all_structs.append(listen_args)
-listen_args.thrift_spec = (
+all_structs.append(smallListen_args)
+smallListen_args.thrift_spec = (
     None,  # 0
     (1, TType.STRING, 'key', 'UTF8', None, ),  # 1
     (2, TType.STRING, 'value', 'UTF8', None, ),  # 2
-    (3, TType.I32, 'version', None, None, ),  # 3
-    (4, TType.I32, 'cid', None, None, ),  # 4
-    (5, TType.SET, 'seen', (TType.I32, None, False), None, ),  # 5
+    (3, TType.I32, 'kv_ts', None, None, ),  # 3
+    (4, TType.I32, 'rid', None, None, ),  # 4
+    (5, TType.I32, 'cid', None, None, ),  # 5
+    (6, TType.I32, 'version', None, None, ),  # 6
+    (7, TType.SET, 'seen', (TType.I32, None, False), None, ),  # 7
+    (8, TType.I32, 'msg_ts', None, None, ),  # 8
 )
 
 
-class listen_result(object):
+class smallListen_result(object):
 
 
     def read(self, iprot):
@@ -1395,7 +1506,7 @@ class listen_result(object):
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
-        oprot.writeStructBegin('listen_result')
+        oprot.writeStructBegin('smallListen_result')
         oprot.writeFieldStop()
         oprot.writeStructEnd()
 
@@ -1412,8 +1523,155 @@ class listen_result(object):
 
     def __ne__(self, other):
         return not (self == other)
-all_structs.append(listen_result)
-listen_result.thrift_spec = (
+all_structs.append(smallListen_result)
+smallListen_result.thrift_spec = (
+)
+
+
+class bigListen_args(object):
+    """
+    Attributes:
+     - loaf
+     - seen
+     - msg_ts
+    """
+
+
+    def __init__(self, loaf=None, seen=None, msg_ts=None,):
+        self.loaf = loaf
+        self.seen = seen
+        self.msg_ts = msg_ts
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.MAP:
+                    self.loaf = {}
+                    (_ktype26, _vtype27, _size25) = iprot.readMapBegin()
+                    for _i29 in range(_size25):
+                        _key30 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                        _val31 = Bread()
+                        _val31.read(iprot)
+                        self.loaf[_key30] = _val31
+                    iprot.readMapEnd()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.SET:
+                    self.seen = set()
+                    (_etype35, _size32) = iprot.readSetBegin()
+                    for _i36 in range(_size32):
+                        _elem37 = iprot.readI32()
+                        self.seen.add(_elem37)
+                    iprot.readSetEnd()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.I32:
+                    self.msg_ts = iprot.readI32()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('bigListen_args')
+        if self.loaf is not None:
+            oprot.writeFieldBegin('loaf', TType.MAP, 1)
+            oprot.writeMapBegin(TType.STRING, TType.STRUCT, len(self.loaf))
+            for kiter38, viter39 in self.loaf.items():
+                oprot.writeString(kiter38.encode('utf-8') if sys.version_info[0] == 2 else kiter38)
+                viter39.write(oprot)
+            oprot.writeMapEnd()
+            oprot.writeFieldEnd()
+        if self.seen is not None:
+            oprot.writeFieldBegin('seen', TType.SET, 2)
+            oprot.writeSetBegin(TType.I32, len(self.seen))
+            for iter40 in self.seen:
+                oprot.writeI32(iter40)
+            oprot.writeSetEnd()
+            oprot.writeFieldEnd()
+        if self.msg_ts is not None:
+            oprot.writeFieldBegin('msg_ts', TType.I32, 3)
+            oprot.writeI32(self.msg_ts)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+all_structs.append(bigListen_args)
+bigListen_args.thrift_spec = (
+    None,  # 0
+    (1, TType.MAP, 'loaf', (TType.STRING, 'UTF8', TType.STRUCT, [Bread, None], False), None, ),  # 1
+    (2, TType.SET, 'seen', (TType.I32, None, False), None, ),  # 2
+    (3, TType.I32, 'msg_ts', None, None, ),  # 3
+)
+
+
+class bigListen_result(object):
+
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('bigListen_result')
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+all_structs.append(bigListen_result)
+bigListen_result.thrift_spec = (
 )
 fix_spec(all_structs)
 del all_structs
