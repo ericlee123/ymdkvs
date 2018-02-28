@@ -5,7 +5,7 @@ import threading
 # thrift stuff
 sys.path.append('gen-py')
 from replica import Replica
-from replica.ttypes import ReadResult
+from replica.ttypes import Bread, ReadResult
 from thrift.transport import TSocket
 from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
@@ -24,6 +24,7 @@ class ReplicaHandler:
 
     def setID(self, id):
         self.id = id
+        self.ts += 1
 
     def addConnection(self, id, port):
         transport = TSocket.TSocket('localhost', port)
@@ -37,6 +38,8 @@ class ReplicaHandler:
         self.transports[id] = (transport, threading.Lock())
         transport.close()
 
+        self.ts += 1
+
         return id in self.reachable
 
     def removeConnection(self, id):
@@ -46,15 +49,20 @@ class ReplicaHandler:
         transport.close()
         lock.release()
         self.stubs.pop(id, None)
+
+        self.ts += 1
+
         return id not in self.reachable
 
     def getStore(self):
         bread = dict()
         for key, value in self.kv_store.items():
             bread[key] = value[0]
+        self.ts += 1
         return bread
 
     def read(self, key, cid, version):
+        self.ts += 1
         if key not in self.kv_store:
             rr = ReadResult()
             rr.value = "ERR_DEP"
@@ -77,6 +85,7 @@ class ReplicaHandler:
             return rr
 
     def write(self, key, value, cid, version):
+        self.ts += 1
         breadcrumbs = {cid: version}
         if key in self.kv_store:
             breadcrumbs = self.kv_store[key][3]
@@ -117,33 +126,64 @@ class ReplicaHandler:
         transport.close()
         lock.release()
 
+    def bigListen(self, loaf, seen, msg_ts):
+        self.ts = max(self.ts, msg_ts) + 1
+        thread.start_new_thread(self.bigProcess, (loaf, seen))
 
-    def listen(self, key, value, version, cid, seen):
-        thread.start_new_thread(self.process, (key, value, version, cid, seen))
+    def bigProcess(self, loaf, seen):
 
-    def process(self, key, value, version, cid, seen):
-        if key not in self.kv_store:
-            self.kv_store[key] = (value, {cid: version})
-            seen.add(self.id)
+        forward = dict()
+        gossip = False
+
+        for k, value, kv_ts, rid, crumbs in loaf.items():
+            if k not in self.kv_store:
+                self.kv_store[k] = (value, kv_ts, rid, crumbs)
+                forward[k] = self.kv_store[k]
+            else:
+                my_value, my_kv_ts, my_rid, my_crumbs = self.kv_store[k]
+                max_crumbs = dict()
+                for cid in crumbs.key().union(my_crumbs.key()):
+                    max_crumbs = max(crumbs.get(cid, -1), my_crumbs.get(cid, -1))
+                if kv_ts > my_kv_ts or (kv_ts == my_kv_ts and rid < my_rid):
+                    self.kv_store[key] = (value, kv_ts, rid, max_crumbs)
+                else:
+                    forward[k] = (my_value, my_kv_ts, my_rid, max_crumbs)
+                    gossip = True
+
+        for mine in self.kv_store.key().difference(loaf.keys()):
+            forward[k] = self.kv_store[mine]
+            gossip = True
+
+        if gossip:
+            for r in self.reachable.difference({self.id}):
+                self.bigGossip({self.id}, forward, to)
         else:
-            my_value, my_breadcrumbs = self.kv_store[key]
-            if version >= my_breadcrumbs.get(cid, 0): # gossip more up-to-date
-                my_breadcrumbs[cid] = version
-                self.kv_store[key] = (value, my_breadcrumbs)
-                seen.add(self.id)
-            else: # me more up-to-date
-                seen = {self.id}
-                value = my_value
-                version = my_breadcrumbs[cid]
+            seen.add(self.id)
+            for r in self.reachable.difference(seen):
+                self.bigBreadGossip(loaf, seen, r)
 
-        # TODO: make this multithreaded
-        for r in self.reachable.difference(seen):
-            self.gossip(key, value, version, cid, seen, r)
-
-    def gossip(self, key, value, version, cid, seen, rid):
-        transport, lock = self.transports[rid]
+    def bigGossip(self, store, seen, to):
+        breadmap = dict()
+        for k in store:
+            b = Bread()
+            b.value = store[k][0]
+            b.kv_ts = store[k][1]
+            b.rid = store[k][2]
+            b.crumbs = store[k][3]
+            breadmap[k] = b
+        transport, lock = self.transports[to]
         lock.acquire(True)
         transport.open()
-        self.stubs[rid].listen(key, value, version, cid, seen)
+        self.stubs[to].bigListen(breadmap, seen, self.ts)
         transport.close()
         lock.release()
+        self.ts += 1
+
+    def bigBreadGossip(self, loaf, seen, to):
+        transport, lock = self.transports[to]
+        lock.acquire(True)
+        transport.open()
+        self.stubs[to].bigListen(loaf, seen, self.ts)
+        transport.close()
+        lock.release()
+        self.ts += 1

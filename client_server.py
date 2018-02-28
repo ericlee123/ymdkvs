@@ -64,5 +64,6 @@ class ClientHandler:
         self.transports[rid].open()
         rr = self.stubs[rid].read(key, self.id, version)
         self.transports[rid].close()
+        self.last_seen[key] = rr.version
         # TODO: check version
         return rr.value
