@@ -32,11 +32,11 @@ class ReplicaHandler:
         protocol = TBinaryProtocol.TBinaryProtocol(transport)
         replica = Replica.Client(protocol)
 
-        transport.open()
         self.reachable.add(id)
         self.stubs[id] = replica
         self.transports[id] = (transport, threading.Lock())
-        transport.close()
+
+        self.bigGossip(self.kv_store, {self.id}, id)
 
         self.ts += 1
 
@@ -44,10 +44,14 @@ class ReplicaHandler:
 
     def removeConnection(self, id):
         self.reachable.remove(id)
-        transport, lock = self.transports[id]
-        lock.acquire(True)
-        transport.close()
-        lock.release()
+        # print "thyah"
+        # transport, lock = self.transports[id]
+        # print "whyah"
+        # lock.acquire(True)
+        # print "qhyah"
+        # transport.close()
+        # print "fhyah"
+        # lock.release()
         self.stubs.pop(id, None)
 
         self.ts += 1
@@ -135,28 +139,32 @@ class ReplicaHandler:
         forward = dict()
         gossip = False
 
-        for k, value, kv_ts, rid, crumbs in loaf.items():
+        for k, bread in loaf.items():
+            value = bread.value
+            kv_ts = bread.kv_ts
+            rid = bread.rid
+            crumbs = bread.crumbs
             if k not in self.kv_store:
                 self.kv_store[k] = (value, kv_ts, rid, crumbs)
                 forward[k] = self.kv_store[k]
             else:
                 my_value, my_kv_ts, my_rid, my_crumbs = self.kv_store[k]
                 max_crumbs = dict()
-                for cid in crumbs.key().union(my_crumbs.key()):
-                    max_crumbs = max(crumbs.get(cid, -1), my_crumbs.get(cid, -1))
+                for cid in set(crumbs.keys()).union(set(my_crumbs.keys())):
+                    max_crumbs[cid] = max(crumbs.get(cid, -1), my_crumbs.get(cid, -1))
                 if kv_ts > my_kv_ts or (kv_ts == my_kv_ts and rid < my_rid):
-                    self.kv_store[key] = (value, kv_ts, rid, max_crumbs)
+                    self.kv_store[k] = (value, kv_ts, rid, max_crumbs)
                 else:
                     forward[k] = (my_value, my_kv_ts, my_rid, max_crumbs)
                     gossip = True
 
-        for mine in self.kv_store.key().difference(loaf.keys()):
+        for mine in set(self.kv_store.keys()).difference(set(loaf.keys())):
             forward[k] = self.kv_store[mine]
             gossip = True
 
         if gossip:
             for r in self.reachable.difference({self.id}):
-                self.bigGossip({self.id}, forward, to)
+                self.bigGossip(forward, {self.id}, r)
         else:
             seen.add(self.id)
             for r in self.reachable.difference(seen):

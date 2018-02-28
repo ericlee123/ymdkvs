@@ -36,7 +36,7 @@ def spinUpClient(port):
 class Master:
 
     def __init__(self):
-        self.openPort = 6262
+        self.openPort = 6266
         self.ports = dict() # id -> ports
         self.procs = dict() # id -> process
         self.replicas = set()
@@ -93,9 +93,13 @@ class Master:
         replica.setID(id)
         # connect everyone
         for sid, server in self.stubs.items():
+            if sid not in self.replicas:
+                continue
+            transport.close()
             self.transports[sid].open()
             server.addConnection(id, self.openPort)
             self.transports[sid].close()
+            transport.open()
             replica.addConnection(sid, self.ports[sid])
         transport.close()
 
@@ -147,10 +151,10 @@ class Master:
     def createConnection(self, id1, id2):
         # TODO: include ports in arguments
         self.transports[id1].open()
-        self.transports[id2].open()
         self.stubs[id1].addConnection(id2, self.ports[id2])
-        self.stubs[id2].addConnection(id1, self.ports[id1])
         self.transports[id1].close()
+        self.transports[id2].open()
+        self.stubs[id2].addConnection(id1, self.ports[id1])
         self.transports[id2].close()
 
     def stabilize(self):
@@ -160,7 +164,6 @@ class Master:
             match = True
             for r in self.replicas:
                 self.transports[r].open()
-                print "r: " + str(r) + " " + str(self.stubs[r].getStore())
                 if store is None:
                     store = self.stubs[r].getStore()
                 elif store != self.stubs[r].getStore():
