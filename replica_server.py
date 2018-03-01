@@ -47,9 +47,9 @@ class ReplicaHandler:
     def removeConnection(self, id):
         # _, lock = self.transports[id]
         # lock.acquire(True)
-        self.reachable_lock.acquire(True)
+        # self.reachable_lock.acquire(True)
         self.reachable.discard(id)
-        self.reachable_lock.release()
+        # self.reachable_lock.release()
         # self.stubs.pop(id)
         # self.transports.pop(id)
         # lock.release() # TODO: is the lock still valid after pop?
@@ -134,8 +134,11 @@ class ReplicaHandler:
     def smallGossip(self, key, value, kv_ts, rid, cid, version, seen, to):
         transport, lock = self.transports[to]
         lock.acquire(True)
-        transport.open()
-        self.stubs[to].smallListen(key, value, kv_ts, rid, cid, version, seen, self.ts)
+        try:
+            transport.open()
+            self.stubs[to].smallListen(key, value, kv_ts, rid, cid, version, seen, self.ts)
+        except:
+            pass
         self.ts += 1
         transport.close()
         lock.release()
