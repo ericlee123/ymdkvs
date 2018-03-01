@@ -5,7 +5,7 @@ struct ReadResult {
 
 struct Bread {
     1: string value;
-    2: i32 kvts;
+    2: i32 kv_ts;
     3: i32 rid;
     4: map<i32, i32> crumbs; # cid -> version
 }

@@ -42,12 +42,12 @@ class ReplicaHandler:
         return id in self.reachable
 
     def removeConnection(self, id):
-        _, lock = self.transports[id]
-        lock.acquire(True)
+        # _, lock = self.transports[id]
+        # lock.acquire(True)
         self.reachable.remove(id)
-        self.stubs.pop(id)
-        self.transports.pop(id)
-        lock.release() # TODO: is the lock still valid after pop?
+        # self.stubs.pop(id)
+        # self.transports.pop(id)
+        # lock.release() # TODO: is the lock still valid after pop?
 
         self.ts += 1
 
@@ -157,7 +157,7 @@ class ReplicaHandler:
                     gossip = True
 
         for mine in set(self.kv_store.keys()).difference(set(loaf.keys())):
-            forward[k] = self.kv_store[mine]
+            forward[mine] = self.kv_store[mine]
             gossip = True
 
         if gossip:
