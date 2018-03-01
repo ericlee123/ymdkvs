@@ -47,7 +47,7 @@ class Master:
     def listen(self):
         for cmd in sys.stdin:
 
-            print cmd[:-1]
+            # print cmd[:-1]
             args = cmd.split(" ")
             fn = args[0].rstrip()
 
@@ -114,6 +114,7 @@ class Master:
             self.transports[sid].open()
             self.stubs[sid].removeConnection(id)
             self.transports[sid].close()
+        self.replicas.remove(id)
         self.stubs.pop(id)
         self.procs[id].terminate()
 
