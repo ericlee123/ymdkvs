@@ -41,7 +41,6 @@ service Replica {
     # replica ----------------------------------------------------------------------------------------------------
     # functions that other replicas will call
 
-    # returns a list of new writes to the requesting server
     AntiEntropyResult antiEntropyRequest(
         1: i32 id,
         2: map<i32, i32> vector_clock

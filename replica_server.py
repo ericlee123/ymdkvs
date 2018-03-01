@@ -43,6 +43,7 @@ class ReplicaHandler:
         self.vector_clock = defaultdict(int)
         self.accept_time = 0
         self.write_log = []
+        # TODO rename
         self.lock = threading.Lock()
         # use lock around iterating through or modifying the reachable set to
         # avoid the following error:
@@ -51,6 +52,8 @@ class ReplicaHandler:
         # lock around the stabilize function
         self.stabilize_lock = threading.Lock()
 
+        # starts thread that is always running. This thread handles periodically
+        # asking other replicas for updates
         thread = Thread(target=self.periodicAntiEntropy, args=())
         thread.start()
 
@@ -94,6 +97,7 @@ class ReplicaHandler:
         return bread
 
     def write(self, key, value, cid):
+        # add this write to the write log
         self.write_log.append({
             'key': key,
             'value': value,
@@ -103,59 +107,34 @@ class ReplicaHandler:
         self.kv_store[key] = value
         self.accept_time += 1
         self.vector_clock[self.id] = self.accept_time
-        return self.convertToThriftFormat_vectorClock(self.vector_clock) # TODO change the thrift to return something, a map I guess
-
-    # TODO perhaps move this into a vector clock class
-    def convertToThriftFormat_vectorClock(self, default_dict):
-        result = {}
-        for k, v in default_dict.iteritems():
-            # map needs to be of type i32 -> i32 according to thrift schema
-            result[int(k)] = int(v)
-        return result
-
-    def convert_from_thrift_format_vectorclock(self, currMap):
-        result = defaultdict(int)
-        for k, v in currMap.iteritems():
-            result[k] = v
-        return result
-
-    # converts a write log entry to be {string -> string} which is necessary in
-    # order to send it over thrift
-    def convertToThriftFormat_writeLogEntry(self, write_log_entry):
-        result = {}
-        for k, v in write_log_entry.iteritems():
-            result[str(k)] = str(v)
-        return result
-
-    def convertFromThriftFormat_writeLogEntry(self, write_log_entry):
-        result = {
-            'key': write_log_entry['key'],
-            'value': write_log_entry['value'],
-            'accept_time': int(write_log_entry['accept_time']),
-            'replica_id': int(write_log_entry['replica_id'])
-        }
-        return result
+        return self.convertToThriftFormat_vectorClock(self.vector_clock)
 
     def read(self, key, cid, client_vector_clock):
+        # check if key is present in the key-value store in this replica
         if key not in self.kv_store:
             rr = ReadResult()
             rr.value = "ERR_KEY"
             rr.vector_clock = self.convertToThriftFormat_vectorClock(self.vector_clock)
             return rr
-
-        # if even one element of the client vector clock is ahead of this replica's vector clock, return ERR_DEP
+        # if even one element of the client vector clock is ahead of this
+        # replica's vector clock, return ERR_DEP. It's possible that a different
+        # replica has more information that this replica is not aware of
         for replica_id, latest_accept_time_seen_by_client in client_vector_clock.iteritems():
             if self.vector_clock[replica_id] < latest_accept_time_seen_by_client:
                 rr = ReadResult()
                 rr.value = "ERR_DEP"
                 rr.vector_clock = self.convertToThriftFormat_vectorClock(self.vector_clock)
                 return rr
-
+        # send read result back to requesting client
         rr = ReadResult()
         rr.value = self.kv_store[key]
         rr.vector_clock = self.convertToThriftFormat_vectorClock(self.vector_clock)
         return rr
 
+    # this method is called when another replica sends this replica an
+    # anti-entropy request. This function then uses the other server's vector
+    # clock to determine which writes are new for that server. It then returns
+    # all the new writes.
     def antiEntropyRequest(self, other_server_id, other_server_vector_clock):
         new_writes = []
         other_server_vector_clock = self.convertFromThriftFormat_vectorClock(other_server_vector_clock)
@@ -171,35 +150,35 @@ class ReplicaHandler:
         response.new_writes = new_writes
         return response
 
+    # periodically pings other replicas for updates
     def periodicAntiEntropy(self):
         while True:
             sleep(0.25)
-            # send anti entropy request to each other reachable server
-            # one-by-one and process the new write logs
             self.stabilize()
 
     # performs one round of anti-entropy
     def stabilize(self):
         self.stabilize_lock.acquire()
         self.reachable_lock.acquire()
+        # send anti entropy request to each other reachable server one-by-one
+        # and process the new write logs
         for server_id in self.reachable:
             dict_vector_clock = self.convertToThriftFormat_vectorClock(self.vector_clock)
-
+            # send anti-entropy request to other replica
             self.transports[server_id][0].open()
             anti_entropy_result = self.stubs[server_id].antiEntropyRequest(self.id, dict_vector_clock)
             self.transports[server_id][0].close()
-
+            # process anti-entropy result
             self.lock.acquire()
             new_writes = anti_entropy_result.new_writes
             other_server_vector_clock = anti_entropy_result.vector_clock
-
             if len(new_writes) > 0:
                 # add new writes to this server's write log and sort
                 self.addNewWritesToWriteLog(anti_entropy_result.new_writes)
-                # process full write history to get an up-to-date key-value store
+                # process full write history to get an up-to-date key-value
+                # store
                 # TODO might only need to do this at end of loop, think about it
                 self.kv_store = self.processWriteLogHistory()
-
             # update this server's vector clock
             for k, v in other_server_vector_clock.iteritems():
                 self.vector_clock[k] = max(self.vector_clock[k], other_server_vector_clock[k])
@@ -207,7 +186,10 @@ class ReplicaHandler:
         self.reachable_lock.release()
         self.stabilize_lock.release()
 
+    # Adds the writes that are contained in the parameter new_writes and then
+    # sorts the list of writes and removes duplicates
     def addNewWritesToWriteLog(self, new_writes):
+        # add all new writes to this replica's write log
         for write in new_writes:
             write = self.convertFromThriftFormat_writeLogEntry(write)
             self.write_log.append(write)
@@ -223,8 +205,47 @@ class ReplicaHandler:
                 self.write_log.pop(i)
                 i -= 1
 
+    # Starts from a fresh/empty key value store dict. Runs every write that has
+    # ever occurred. Returns resulting key value store dict.
     def processWriteLogHistory(self):
         new_kv_store = {}
         for write in self.write_log:
             new_kv_store[write['key']] = write['value']
         return new_kv_store
+
+    # -------------------------------------------------------------------------
+    # Helper functions
+
+    # converts the dict to a defaultDict
+    def convertToThriftFormat_vectorClock(self, default_dict):
+        result = {}
+        for k, v in default_dict.iteritems():
+            # map needs to be of type i32 -> i32 according to thrift schema
+            result[int(k)] = int(v)
+        return result
+
+    # converts the dict to a defaultDict
+    def convert_from_thrift_format_vectorclock(self, currMap):
+        result = defaultdict(int)
+        for k, v in currMap.iteritems():
+            result[k] = v
+        return result
+
+    # converts a write log entry to be {string -> string} which is necessary in
+    # order to send it over thrift
+    def convertToThriftFormat_writeLogEntry(self, write_log_entry):
+        result = {}
+        for k, v in write_log_entry.iteritems():
+            result[str(k)] = str(v)
+        return result
+
+    # changes the {string -> string} to have the appropriate types for the
+    # values
+    def convertFromThriftFormat_writeLogEntry(self, write_log_entry):
+        result = {
+            'key': write_log_entry['key'],
+            'value': write_log_entry['value'],
+            'accept_time': int(write_log_entry['accept_time']),
+            'replica_id': int(write_log_entry['replica_id'])
+        }
+        return result
