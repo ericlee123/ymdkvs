@@ -36,7 +36,7 @@ def spinUpClient(port):
 class Master:
 
     def __init__(self):
-        self.openPort = 6266
+        self.openPort = 6262
         self.ports = dict() # id -> ports
         self.procs = dict() # id -> process
         self.replicas = set()
@@ -81,7 +81,7 @@ class Master:
         p = Process(target=spinUpServer, args=(self.openPort,))
         p.start()
 
-        time.sleep(self.wait) # wait for server.serve() [messy]
+        time.sleep(self.wait) # wait for server.serve(), kind of messy
 
         # set up RPC to replica server
         transport = TSocket.TSocket('localhost', self.openPort)
@@ -91,17 +91,16 @@ class Master:
 
         transport.open()
         replica.setID(id)
-        # connect everyone
-        for sid, server in self.stubs.items():
-            if sid not in self.replicas:
-                continue
-            transport.close()
-            self.transports[sid].open()
-            server.addConnection(id, self.openPort)
-            self.transports[sid].close()
-            transport.open()
-            replica.addConnection(sid, self.ports[sid])
         transport.close()
+        # connect to all other replicas
+        for rid in self.replicas:
+            self.transports[rid].open()
+            self.stubs[rid].addConnection(id, self.openPort)
+            self.transports[rid].close()
+
+            transport.open()
+            replica.addConnection(rid, self.ports[rid])
+            transport.close()
 
         self.ports[id] = self.openPort
         self.procs[id] = p
@@ -111,9 +110,11 @@ class Master:
         self.openPort += 1
 
     def killServer(self, id):
-        for _, server in self.stubs.items():
-            server.removeConnection(id)
-        self.stubs.pop(id, None)
+        for sid in self.stubs:
+            self.transports[sid].open()
+            self.stubs[sid].removeConnection(id)
+            self.transports[sid].close()
+        self.stubs.pop(id)
         self.procs[id].terminate()
 
     def joinClient(self, clientID, serverID):
@@ -149,7 +150,6 @@ class Master:
         self.transports[id2].close()
 
     def createConnection(self, id1, id2):
-        # TODO: include ports in arguments
         self.transports[id1].open()
         self.stubs[id1].addConnection(id2, self.ports[id2])
         self.transports[id1].close()
