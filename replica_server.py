@@ -34,12 +34,12 @@ class ReplicaHandler:
     def __init__(self):
         self.id = -1
         self.kv_store = {} # key -> (value, [client -> version])
-        self.num_servers = 0 # this should be initialized after talking to every other server
         self.reachable = set()
         self.stubs = dict()
         self.transports = dict() # id -> (transport, lock)
 
-        # map from server ID to the last accept time from that server that this server is aware of
+        # map from server ID to the last accept time from that server that this
+        # server is aware of
         self.vector_clock = defaultdict(int)
         self.accept_time = 0
         self.write_log = []
@@ -216,7 +216,7 @@ class ReplicaHandler:
     # -------------------------------------------------------------------------
     # Helper functions
 
-    # converts the dict to a defaultDict
+    # converts the defaultDict to a dict
     def convertToThriftFormat_vectorClock(self, default_dict):
         result = {}
         for k, v in default_dict.iteritems():
@@ -225,7 +225,7 @@ class ReplicaHandler:
         return result
 
     # converts the dict to a defaultDict
-    def convert_from_thrift_format_vectorclock(self, currMap):
+    def convertFromThriftFormat_vectorClock(self, currMap):
         result = defaultdict(int)
         for k, v in currMap.iteritems():
             result[k] = v

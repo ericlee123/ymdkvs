@@ -2,17 +2,21 @@ joinServer 0
 joinServer 1
 joinServer 2
 joinServer 3
+joinServer 4
 breakConnection 0 2
-breakConnection 1 2
 breakConnection 0 3
+breakConnection 0 4
 breakConnection 1 3
-joinClient 4 0
-joinClient 5 2
-put 4 eric lee
-put 5 sumanth balaraman
+breakConnection 1 4
+breakConnection 2 4
+joinClient 5 0
+joinClient 6 4
+put 5 yo dawg
+put 6 sup bruh
 stabilize
 printStore 0
 printStore 1
 printStore 2
 printStore 3
+printStore 4
 

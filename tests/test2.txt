@@ -16,3 +16,4 @@ put 9 e 5
 stabilize
 printStore 4
 get 8 b
+

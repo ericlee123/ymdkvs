@@ -4,5 +4,12 @@ joinServer 2
 joinServer 3
 joinServer 4
 joinClient 5 0
-put 5 0 1111111111
+joinClient 6 4
+put 5 0 111
+put 6 0 000
+get 5 0
+get 6 0
 stabilize
+get 5 0
+get 6 0
+
