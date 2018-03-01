@@ -16,7 +16,6 @@ class ReplicaHandler:
     def __init__(self):
         self.id = -1
         self.kv_store = {} # key -> (value, kv_ts, rid, [client -> version])
-        self.num_servers = 0 # this should be initialized after talking to every other server
         self.reachable = set()
         self.stubs = dict()
         self.transports = dict() # id -> (transport, lock)
@@ -43,61 +42,60 @@ class ReplicaHandler:
         return id in self.reachable
 
     def removeConnection(self, id):
+        _, lock = self.transports[id]
+        lock.acquire(True)
         self.reachable.remove(id)
-        # print "thyah"
-        # transport, lock = self.transports[id]
-        # print "whyah"
-        # lock.acquire(True)
-        # print "qhyah"
-        # transport.close()
-        # print "fhyah"
-        # lock.release()
-        self.stubs.pop(id, None)
+        self.stubs.pop(id)
+        self.transports.pop(id)
+        lock.release() # TODO: is the lock still valid after pop?
 
         self.ts += 1
 
         return id not in self.reachable
 
     def getStore(self):
-        bread = dict()
+        just_kv = dict()
         for key, value in self.kv_store.items():
-            bread[key] = value[0]
+            just_kv[key] = value[0]
         self.ts += 1
-        return bread
+        return just_kv
 
     def read(self, key, cid, version):
-        self.ts += 1
+        rr = ReadResult()
+
         if key not in self.kv_store:
-            rr = ReadResult()
             rr.value = "ERR_DEP"
             rr.version = -1
-            return rr
-
-        my_version = self.kv_store[key][1].get(cid)
-        if my_version is None:
-            self.kv_store[key][1][cid] = version
-
-        if my_version >= version:
-            rr = ReadResult()
-            rr.value = self.kv_store[key][0]
-            rr.version = my_version
-            return rr
         else:
-            rr = ReadResult()
-            rr.value = "ERR_DEP"
-            rr.version = -1
-            return rr
+            crumbs = self.kv_store[key][3]
+            if cid not in crumbs:
+                self.kv_store[key][3][cid] = version
+
+            my_version = self.kv_store[key][3][cid]
+            if my_version >= version:
+                rr.value = self.kv_store[key][0]
+                rr.version = my_version
+            else:
+                rr.value = "ERR_DEP"
+                rr.verion = -1
+
+        self.ts += 1
+        return rr
 
     def write(self, key, value, cid, version):
+        if key not in self.kv_store:
+            self.kv_store[key] = (value, self.ts, self.id, {cid: version})
+        else:
+            # TODO: should we compare ts + rid? no for now
+            crumbs = self.kv_store[key][3]
+            crumbs[cid] = version
+            self.kv_store[key] = (value, self.ts, self.id, crumbs)
+
         self.ts += 1
-        breadcrumbs = {cid: version}
-        if key in self.kv_store:
-            breadcrumbs = self.kv_store[key][3]
-            breadcrumbs[cid] = version
-        self.kv_store[key] = (value, self.ts, self.id, breadcrumbs)
-        for r in self.reachable.difference({self.id}):
+        # make small gossip
+        for rid in self.reachable:
             thread.start_new_thread(self.smallGossip,
-                (key, value, self.ts, self.id, cid, version, {self.id}, r))
+                (key, value, self.ts, self.id, cid, version, {self.id}, rid))
 
     def smallListen(self, key, value, kv_ts, rid, cid, version, seen, msg_ts):
         self.ts = max(self.ts, msg_ts) + 1

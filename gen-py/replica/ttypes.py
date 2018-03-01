@@ -87,15 +87,15 @@ class Bread(object):
     """
     Attributes:
      - value
-     - kv_ts
+     - kvts
      - rid
      - crumbs
     """
 
 
-    def __init__(self, value=None, kv_ts=None, rid=None, crumbs=None,):
+    def __init__(self, value=None, kvts=None, rid=None, crumbs=None,):
         self.value = value
-        self.kv_ts = kv_ts
+        self.kvts = kvts
         self.rid = rid
         self.crumbs = crumbs
 
@@ -115,7 +115,7 @@ class Bread(object):
                     iprot.skip(ftype)
             elif fid == 2:
                 if ftype == TType.I32:
-                    self.kv_ts = iprot.readI32()
+                    self.kvts = iprot.readI32()
                 else:
                     iprot.skip(ftype)
             elif fid == 3:
@@ -148,9 +148,9 @@ class Bread(object):
             oprot.writeFieldBegin('value', TType.STRING, 1)
             oprot.writeString(self.value.encode('utf-8') if sys.version_info[0] == 2 else self.value)
             oprot.writeFieldEnd()
-        if self.kv_ts is not None:
-            oprot.writeFieldBegin('kv_ts', TType.I32, 2)
-            oprot.writeI32(self.kv_ts)
+        if self.kvts is not None:
+            oprot.writeFieldBegin('kvts', TType.I32, 2)
+            oprot.writeI32(self.kvts)
             oprot.writeFieldEnd()
         if self.rid is not None:
             oprot.writeFieldBegin('rid', TType.I32, 3)
@@ -190,7 +190,7 @@ all_structs.append(Bread)
 Bread.thrift_spec = (
     None,  # 0
     (1, TType.STRING, 'value', 'UTF8', None, ),  # 1
-    (2, TType.I32, 'kv_ts', None, None, ),  # 2
+    (2, TType.I32, 'kvts', None, None, ),  # 2
     (3, TType.I32, 'rid', None, None, ),  # 3
     (4, TType.MAP, 'crumbs', (TType.I32, None, TType.I32, None, False), None, ),  # 4
 )
