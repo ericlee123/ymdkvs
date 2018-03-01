@@ -75,12 +75,10 @@ class ReplicaHandler:
 
     def removeConnection(self, id):
         self.reachable_lock.acquire()
-        # print '[replica_server {} removeConnection] before removing {}, reachable = {}'.format(self.id, id, self.reachable)
         if id not in self.reachable:
             self.reachable_lock.release()
             return id not in self.reachable
         self.reachable.remove(id)
-        # print '[replica_server {} removeConnection] after removing {}, reachable = {}'.format(self.id, id, self.reachable)
         self.reachable_lock.release()
         transport, lock = self.transports[id]
         lock.acquire(True)
@@ -140,14 +138,12 @@ class ReplicaHandler:
 
     def read(self, key, cid, client_vector_clock):
         if key not in self.kv_store:
-            # print '[replica_server ' + str(self.id) + ' read] key, ' + key + ', not in key-value store. Returning ERR_KEY'
             rr = ReadResult()
             rr.value = "ERR_KEY"
             rr.vector_clock = self.convertToThriftFormat_vectorClock(self.vector_clock)
             return rr
 
         # if even one element of the client vector clock is ahead of this replica's vector clock, return ERR_DEP
-        # print '[replica_server ' + str(self.id) + ' read] CLIENT VECTOR CLOCK = ' + str(client_vector_clock)
         for replica_id, latest_accept_time_seen_by_client in client_vector_clock.iteritems():
             if self.vector_clock[replica_id] < latest_accept_time_seen_by_client:
                 rr = ReadResult()
@@ -163,23 +159,16 @@ class ReplicaHandler:
     def antiEntropyRequest(self, other_server_id, other_server_vector_clock):
         new_writes = []
         other_server_vector_clock = self.convertFromThriftFormat_vectorClock(other_server_vector_clock)
-        # print '[replica_server {} antiEntropyRequest] from server {}'.format(self.id, other_server_id)
-        # print '[replica_server ' + str(self.id) + ' antiEntropyRequest()] other vector clock = ' + str(other_server_vector_clock)
         self.lock.acquire()
-        # print '[replica_server {} antiEntropyRequest] acquired lock'.format(self.id)
         for write in self.write_log:
             if other_server_vector_clock[write['replica_id']] <= write['accept_time']:
                 # write is new for other server
-                # print '[replica_server ' + str(self.id) + ' antiEntropyRequest] \t new write : ' + str(write)
                 new_writes.append(self.convertToThriftFormat_writeLogEntry(write))
         self.lock.release()
-        # print '[replica_server {} antiEntropyRequest] released lock'.format(self.id)
         # return anti entropy result to requesting server
         response = AntiEntropyResult()
         response.vector_clock = self.convertToThriftFormat_vectorClock(self.vector_clock)
         response.new_writes = new_writes
-        # print '[replica_server {} antiEntropyRequest] {} new writes being sent back to server {}'.format(self.id, len(new_writes), other_server_id)
-        # print '[replica_server {} antiEntropyRequest] current kv_store = {}'.format(self.id, self.kv_store)
         return response
 
     def periodicAntiEntropy(self):
@@ -193,38 +182,28 @@ class ReplicaHandler:
     def stabilize(self):
         self.stabilize_lock.acquire()
         self.reachable_lock.acquire()
-        # print '[replica_server {} stabilize] reachable = {}'.format(self.id, self.reachable)
         for server_id in self.reachable:
-            # print '[replica_server ' + str(self.id) + ' stabilize] calling server ' + str(server_id)
             dict_vector_clock = self.convertToThriftFormat_vectorClock(self.vector_clock)
-            # print '[replica_server ' + str(self.id) + ' stabilize] my vector clock = ' + str(dict_vector_clock)
 
             self.transports[server_id][0].open()
             anti_entropy_result = self.stubs[server_id].antiEntropyRequest(self.id, dict_vector_clock)
             self.transports[server_id][0].close()
 
             self.lock.acquire()
-            # print '[replica_server {} stabilize] acquired lock'.format(self.id)
             new_writes = anti_entropy_result.new_writes
             other_server_vector_clock = anti_entropy_result.vector_clock
-            # print '[replica_server ' + str(self.id) + ' stabilize()] new writes from server ' + str(server_id) + ' = ' + str(new_writes)
 
             if len(new_writes) > 0:
                 # add new writes to this server's write log and sort
                 self.addNewWritesToWriteLog(anti_entropy_result.new_writes)
                 # process full write history to get an up-to-date key-value store
-                # print '[replica_server {} stabilize] original kv_store = {}'.format(self.id, self.kv_store)
-                # TODO only need to do this at end of loop, think about it
+                # TODO might only need to do this at end of loop, think about it
                 self.kv_store = self.processWriteLogHistory()
-                # print '[replica_server {} stabilize] up-to-date kv_store = {}'.format(self.id, self.kv_store)
 
             # update this server's vector clock
-            # print '[replica_server {} stabilize] other vector clock = {}'.format(self.id, other_server_vector_clock)
             for k, v in other_server_vector_clock.iteritems():
                 self.vector_clock[k] = max(self.vector_clock[k], other_server_vector_clock[k])
-            # print '[replica_server {} stabilize] updated vector clock = {}'.format(self.id, other_server_vector_clock)
             self.lock.release()
-            # print '[replica_server {} stabilize] released lock'.format(self.id)
         self.reachable_lock.release()
         self.stabilize_lock.release()
 

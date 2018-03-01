@@ -50,7 +50,6 @@ class ClientHandler:
             vector_clock = self.key_vectorclock_map[key]
         self.transports[rid].open()
         new_vector_clock = self.stubs[rid].write(key, value, self.id)
-        # print '[client_server requestWrite] new vector clock for key ' + key + ' = ' + str(new_vector_clock)
         self.key_vectorclock_map[key] = new_vector_clock
         self.transports[rid].close()
 
@@ -61,12 +60,10 @@ class ClientHandler:
             vector_clock = self.key_vectorclock_map[key]
         self.transports[rid].open()
         read_result = self.stubs[rid].read(key, self.id, vector_clock)
-        # print '[client_server requestRead] READ RESULT : ' + str(read_result)
         if read_result.value != 'ERR_DEP' and read_result.value != 'ERR_KEY':
             # update client's vector clock for this key if the result was not
             # some kind of error
             self.key_vectorclock_map[key] = read_result.vector_clock
         self.transports[rid].close()
-        # print '[client_server requestRead] new key_vectorclock_map = ' + str(self.key_vectorclock_map)
         # return value to master
         return read_result.value

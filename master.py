@@ -165,7 +165,6 @@ class Master:
     def stabilize(self):
         # TODO maybe do this once or twice more just-in-case idk
         # send stabilize requests to all servers
-        # print '[master stabilize] replicas = {}'.format(self.replicas)
         for r in self.replicas:
             self.transports[r].open()
             self.stubs[r].stabilize()
