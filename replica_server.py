@@ -17,7 +17,6 @@ class ReplicaHandler:
         self.id = -1
         self.kv_store = {} # key -> (value, kv_ts, rid, [client -> version])
         self.reachable = set()
-        self.reachable_lock = threading.Lock()
         self.stubs = dict()
         self.transports = dict() # id -> (transport, lock)
         self.ts = 0
@@ -32,9 +31,7 @@ class ReplicaHandler:
         protocol = TBinaryProtocol.TBinaryProtocol(transport)
         replica = Replica.Client(protocol)
 
-        self.reachable_lock.acquire(True)
         self.reachable.add(id)
-        self.reachable_lock.release()
         self.stubs[id] = replica
         self.transports[id] = (transport, threading.Lock())
 
@@ -45,14 +42,7 @@ class ReplicaHandler:
         return id in self.reachable
 
     def removeConnection(self, id):
-        # _, lock = self.transports[id]
-        # lock.acquire(True)
-        # self.reachable_lock.acquire(True)
         self.reachable.discard(id)
-        # self.reachable_lock.release()
-        # self.stubs.pop(id)
-        # self.transports.pop(id)
-        # lock.release() # TODO: is the lock still valid after pop?
 
         self.ts += 1
 
@@ -113,21 +103,16 @@ class ReplicaHandler:
         if key not in self.kv_store:
             self.kv_store[key] = (value, kv_ts, rid, {cid: version})
             seen.add(self.id)
-            # TODO: send?
-            self.reachable_lock.acquire(True)
             for r in self.reachable.difference(seen):
                 self.smallGossip(key, value, kv_ts, rid, cid, version, seen, r)
-            self.reachable_lock.release()
         else:
             my_value, my_ts, my_rid, my_versions = self.kv_store[key]
             if kv_ts > my_ts or (kv_ts == my_ts and rid < my_rid): # more up-to-date
                 my_versions[cid] = version
                 self.kv_store[key] = (value, kv_ts, rid, my_versions)
                 seen.add(self.id)
-                self.reachable_lock.acquire(True)
                 for r in self.reachable.difference(seen):
                     self.smallGossip(key, value, kv_ts, rid, cid, version, seen, r)
-                self.reachable_lock.release()
             else: # I'm more up-to-date
                 pass
 
@@ -176,16 +161,12 @@ class ReplicaHandler:
             gossip = True
 
         if gossip:
-            self.reachable_lock.acquire(True)
             for r in self.reachable.difference({self.id}):
                 self.bigGossip(forward, {self.id}, r)
-            self.reachable_lock.release()
         else:
             seen.add(self.id)
-            self.reachable_lock.acquire(True)
             for r in self.reachable.difference(seen):
                 self.bigBreadGossip(loaf, seen, r)
-            self.reachable_lock.release()
 
     def bigGossip(self, store, seen, to):
         breadmap = dict()
@@ -198,8 +179,8 @@ class ReplicaHandler:
             breadmap[k] = b
         transport, lock = self.transports[to]
         lock.acquire(True)
-        transport.open()
         try:
+            transport.open()
             self.stubs[to].bigListen(breadmap, seen, self.ts)
         except:
             pass
@@ -210,8 +191,11 @@ class ReplicaHandler:
     def bigBreadGossip(self, loaf, seen, to):
         transport, lock = self.transports[to]
         lock.acquire(True)
-        transport.open()
-        self.stubs[to].bigListen(loaf, seen, self.ts)
+        try:
+            transport.open()
+            self.stubs[to].bigListen(loaf, seen, self.ts)
+        except:
+            pass
         transport.close()
         lock.release()
         self.ts += 1

@@ -1,0 +1,75 @@
+joinServer 0
+joinServer 1
+joinServer 2
+joinServer 3
+joinServer 4
+joinClient 5 0
+put 5 0 11111111111111
+put 5 00 1111111111111
+put 5 000 111111111111
+put 5 0000 11111111111
+put 5 00000 1111111111
+put 5 000000 111111111
+put 5 0000000 11111111
+put 5 00000000 1111111
+put 5 000000000 111111
+put 5 0000000000 11111
+put 5 00000000000 1111
+put 5 000000000000 111
+put 5 0000000000000 11
+put 5 00000000000000 1
+killServer 4
+joinServer 6
+killServer 6
+joinServer 7
+killServer 7
+joinServer 8
+killServer 8
+joinServer 9
+killServer 9
+joinServer 10
+killServer 10
+joinServer 11
+killServer 11
+joinServer 12
+killServer 12
+joinServer 13
+killServer 13
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
