@@ -28,17 +28,16 @@ class ClientHandler:
         protocol = TBinaryProtocol.TBinaryProtocol(transport)
         replica = Replica.Client(protocol)
 
-        transport.open()
         self.reachable.add(id)
         self.stubs[id] = replica
         self.transports[id] = transport
-        transport.close()
 
         return id in self.reachable
 
     def removeConnection(self, id):
         self.reachable.discard(id)
         self.stubs.pop(id, None)
+        self.transports.pop(id, None)
         return id not in self.reachable
 
     def requestWrite(self, key, value):
@@ -63,6 +62,11 @@ class ClientHandler:
         self.transports[rid].open()
         rr = self.stubs[rid].read(key, self.id, version)
         self.transports[rid].close()
+
+        if rr.version < version:
+            print "ERRROR: session guarantees violated (" + str(rr.version) + " < " + str(version) + ")"
+            return "ERR_DEP"
+
         self.last_seen[key] = rr.version
-        # TODO: check version
+
         return rr.value
