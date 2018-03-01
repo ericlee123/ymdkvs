@@ -18,6 +18,7 @@ class ClientHandler:
         self.reachable = set()
         self.stubs = dict()
         self.transports = dict()
+        self.key_vectorclock_map = dict()
 
     def setID(self, id):
         self.id = id
@@ -44,25 +45,28 @@ class ClientHandler:
 
     def requestWrite(self, key, value):
         rid = random.sample(self.reachable, 1)[0]
-        version = -1
-        if key not in self.last_seen:
-            self.last_seen[key] = 0
-        else:
-            self.last_seen[key] += 1
-        version = self.last_seen[key]
-
+        vector_clock = {}
+        if key in self.key_vectorclock_map:
+            vector_clock = self.key_vectorclock_map[key]
         self.transports[rid].open()
-        self.stubs[rid].write(key, value, self.id, version)
+        new_vector_clock = self.stubs[rid].write(key, value, self.id)
+        # print '[client_server requestWrite] new vector clock for key ' + key + ' = ' + str(new_vector_clock)
+        self.key_vectorclock_map[key] = new_vector_clock
         self.transports[rid].close()
 
     def requestRead(self, key):
         rid = random.sample(self.reachable, 1)[0]
-        if key not in self.last_seen:
-            self.last_seen[key] = 0
-        version = self.last_seen[key]
-
+        vector_clock = {}
+        if key in self.key_vectorclock_map:
+            vector_clock = self.key_vectorclock_map[key]
         self.transports[rid].open()
-        rr = self.stubs[rid].read(key, self.id, version)
+        read_result = self.stubs[rid].read(key, self.id, vector_clock)
+        # print '[client_server requestRead] READ RESULT : ' + str(read_result)
+        if read_result.value != 'ERR_DEP' and read_result.value != 'ERR_KEY':
+            # update client's vector clock for this key if the result was not
+            # some kind of error
+            self.key_vectorclock_map[key] = read_result.vector_clock
         self.transports[rid].close()
-        # TODO: check version
-        return rr.value
+        # print '[client_server requestRead] new key_vectorclock_map = ' + str(self.key_vectorclock_map)
+        # return value to master
+        return read_result.value

@@ -39,7 +39,7 @@ class Master:
         self.openPort = 6262
         self.ports = dict() # id -> ports
         self.procs = dict() # id -> process
-        self.replicas = set()
+        self.replicas = set() # set of replica IDs
         self.stubs = dict() # id -> stub
         self.transports = dict()
         self.wait = 0.05
@@ -47,7 +47,7 @@ class Master:
     def listen(self):
         for cmd in sys.stdin:
 
-            print cmd[:-1]
+            print "----" + cmd.rstrip()
             args = cmd.split(" ")
             fn = args[0].rstrip()
 
@@ -93,6 +93,10 @@ class Master:
         replica.setID(id)
         # connect everyone
         for sid, server in self.stubs.items():
+            # stubs contains replicas and clients, only connect new server to
+            # existing servers
+            if sid not in self.replicas:
+                continue
             self.transports[sid].open()
             server.addConnection(id, self.openPort)
             self.transports[sid].close()
@@ -137,30 +141,35 @@ class Master:
         self.openPort += 1
 
     def breakConnection(self, id1, id2):
+        self.transports[id1].open()
         self.stubs[id1].removeConnection(id2)
+        self.transports[id1].close()
+        self.transports[id2].open()
         self.stubs[id2].removeConnection(id1)
+        self.transports[id2].close()
 
     def createConnection(self, id1, id2):
-        # TODO: include ports in arguments
-        self.stubs[id1].addConnection(id2)
-        self.stubs[id2].addConnection(id1)
+        if (id1 in self.replicas and id2 in self.replicas) or (id1 not in self.replicas and id2 in self.replicas):
+            # basically don't allow server to add a client ID to its reachable
+            # list
+            self.transports[id1].open()
+            self.stubs[id1].addConnection(id2, self.ports[id2])
+            self.transports[id1].close()
+        if (id2 in self.replicas and id1 in self.replicas) or (id2 not in self.replicas and id1 in self.replicas):
+            # basically don't allow server to add a client ID to its reachable
+            # list
+            self.transports[id2].open()
+            self.stubs[id2].addConnection(id1, self.ports[id1])
+            self.transports[id2].close()
 
     def stabilize(self):
-        # TODO: within all connected components, wait for all stores to converge
-        while True:
-            store = None
-            match = True
-            for r in self.replicas:
-                self.transports[r].open()
-                if store is None:
-                    store = self.stubs[r].getStore()
-                elif store != self.stubs[r].getStore():
-                    match = False
-                    self.transports[r].close()
-                    break
-                self.transports[r].close()
-            if match:
-                return
+        # TODO maybe do this once or twice more just-in-case idk
+        # send stabilize requests to all servers
+        # print '[master stabilize] replicas = {}'.format(self.replicas)
+        for r in self.replicas:
+            self.transports[r].open()
+            self.stubs[r].stabilize()
+            self.transports[r].close()
 
     def printStore(self, id):
         self.transports[id].open()

@@ -28,9 +28,10 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
     print('  bool addConnection(i32 id, i32 port)')
     print('  bool removeConnection(i32 id)')
     print('   getStore()')
-    print('  void write(string key, string value, i32 cid, i32 version)')
-    print('  ReadResult read(string key, i32 cid, i32 version)')
-    print('  void listen(string key, string value, i32 version, i32 cid,  seen)')
+    print('  void stabilize()')
+    print('   write(string key, string value, i32 cid)')
+    print('  ReadResult read(string key, i32 cid,  vector_clock)')
+    print('  AntiEntropyResult antiEntropyRequest(i32 id,  vector_clock)')
     print('')
     sys.exit(0)
 
@@ -134,11 +135,17 @@ elif cmd == 'getStore':
         sys.exit(1)
     pp.pprint(client.getStore())
 
-elif cmd == 'write':
-    if len(args) != 4:
-        print('write requires 4 args')
+elif cmd == 'stabilize':
+    if len(args) != 0:
+        print('stabilize requires 0 args')
         sys.exit(1)
-    pp.pprint(client.write(args[0], args[1], eval(args[2]), eval(args[3]),))
+    pp.pprint(client.stabilize())
+
+elif cmd == 'write':
+    if len(args) != 3:
+        print('write requires 3 args')
+        sys.exit(1)
+    pp.pprint(client.write(args[0], args[1], eval(args[2]),))
 
 elif cmd == 'read':
     if len(args) != 3:
@@ -146,11 +153,11 @@ elif cmd == 'read':
         sys.exit(1)
     pp.pprint(client.read(args[0], eval(args[1]), eval(args[2]),))
 
-elif cmd == 'listen':
-    if len(args) != 5:
-        print('listen requires 5 args')
+elif cmd == 'antiEntropyRequest':
+    if len(args) != 2:
+        print('antiEntropyRequest requires 2 args')
         sys.exit(1)
-    pp.pprint(client.listen(args[0], args[1], eval(args[2]), eval(args[3]), eval(args[4]),))
+    pp.pprint(client.antiEntropyRequest(eval(args[0]), eval(args[1]),))
 
 else:
     print('Unrecognized method %s' % cmd)

@@ -8,9 +8,11 @@ joinClient 6 1
 joinClient 7 2
 joinClient 8 3
 joinClient 9 4
-put 5 0 1111111111
-put 6 00 111111111
-put 7 000 11111111
-put 8 0000 1111111
-put 9 00000 111111
+put 5 a 1
+put 6 b 2
+put 7 c 3
+put 8 d 4
+put 9 e 5
 stabilize
+printStore 4
+get 8 b
