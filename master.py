@@ -47,7 +47,7 @@ class Master:
     def listen(self):
         for cmd in sys.stdin:
 
-            # print cmd[:-1]
+            print cmd[:-1]
             args = cmd.split(" ")
             fn = args[0].rstrip()
 
@@ -151,28 +151,29 @@ class Master:
         self.transports[id2].close()
 
     def createConnection(self, id1, id2):
-        self.transports[id1].open()
-        self.stubs[id1].addConnection(id2, self.ports[id2])
-        self.transports[id1].close()
-        self.transports[id2].open()
-        self.stubs[id2].addConnection(id1, self.ports[id1])
-        self.transports[id2].close()
+        if id2 in self.replicas:
+            self.transports[id1].open()
+            self.stubs[id1].addConnection(id2, self.ports[id2])
+            self.transports[id1].close()
+        if id1 in self.replicas:
+            self.transports[id2].open()
+            self.stubs[id2].addConnection(id1, self.ports[id1])
+            self.transports[id2].close()
 
     def stabilize(self):
-        # TODO: within all connected components, wait for all stores to converge
         while True:
-            store = None
-            match = True
+            stable = True
             for r in self.replicas:
                 self.transports[r].open()
-                if store is None:
-                    store = self.stubs[r].getStore()
-                elif store != self.stubs[r].getStore():
-                    match = False
-                    self.transports[r].close()
-                    break
+                connected = self.stubs[r].getReachable()
+                for c in connected:
+                    self.transports[c].open()
+                    stable = stable and (self.stubs[r].getStore() == self.stubs[c].getStore())
+                    self.transports[c].close()
                 self.transports[r].close()
-            if match:
+                if not stable:
+                    break
+            if stable:
                 return
 
     def printStore(self, id):

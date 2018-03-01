@@ -28,6 +28,7 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
     print('  bool addConnection(i32 id, i32 port)')
     print('  bool removeConnection(i32 id)')
     print('   getStore()')
+    print('   getReachable()')
     print('  void write(string key, string value, i32 cid, i32 version)')
     print('  ReadResult read(string key, i32 cid, i32 version)')
     print('  void smallListen(string key, string value, i32 kv_ts, i32 rid, i32 cid, i32 version,  seen, i32 msg_ts)')
@@ -134,6 +135,12 @@ elif cmd == 'getStore':
         print('getStore requires 0 args')
         sys.exit(1)
     pp.pprint(client.getStore())
+
+elif cmd == 'getReachable':
+    if len(args) != 0:
+        print('getReachable requires 0 args')
+        sys.exit(1)
+    pp.pprint(client.getReachable())
 
 elif cmd == 'write':
     if len(args) != 4:

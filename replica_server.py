@@ -65,6 +65,9 @@ class ReplicaHandler:
         self.ts += 1
         return just_kv
 
+    def getReachable(self):
+        return self.reachable
+
     def read(self, key, cid, version):
         rr = ReadResult()
 

@@ -44,6 +44,9 @@ class Iface(object):
     def getStore(self):
         pass
 
+    def getReachable(self):
+        pass
+
     def write(self, key, value, cid, version):
         """
         Parameters:
@@ -213,6 +216,32 @@ class Client(Iface):
             return result.success
         raise TApplicationException(TApplicationException.MISSING_RESULT, "getStore failed: unknown result")
 
+    def getReachable(self):
+        self.send_getReachable()
+        return self.recv_getReachable()
+
+    def send_getReachable(self):
+        self._oprot.writeMessageBegin('getReachable', TMessageType.CALL, self._seqid)
+        args = getReachable_args()
+        args.write(self._oprot)
+        self._oprot.writeMessageEnd()
+        self._oprot.trans.flush()
+
+    def recv_getReachable(self):
+        iprot = self._iprot
+        (fname, mtype, rseqid) = iprot.readMessageBegin()
+        if mtype == TMessageType.EXCEPTION:
+            x = TApplicationException()
+            x.read(iprot)
+            iprot.readMessageEnd()
+            raise x
+        result = getReachable_result()
+        result.read(iprot)
+        iprot.readMessageEnd()
+        if result.success is not None:
+            return result.success
+        raise TApplicationException(TApplicationException.MISSING_RESULT, "getReachable failed: unknown result")
+
     def write(self, key, value, cid, version):
         """
         Parameters:
@@ -368,6 +397,7 @@ class Processor(Iface, TProcessor):
         self._processMap["addConnection"] = Processor.process_addConnection
         self._processMap["removeConnection"] = Processor.process_removeConnection
         self._processMap["getStore"] = Processor.process_getStore
+        self._processMap["getReachable"] = Processor.process_getReachable
         self._processMap["write"] = Processor.process_write
         self._processMap["read"] = Processor.process_read
         self._processMap["smallListen"] = Processor.process_smallListen
@@ -476,6 +506,29 @@ class Processor(Iface, TProcessor):
             msg_type = TMessageType.EXCEPTION
             result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
         oprot.writeMessageBegin("getStore", msg_type, seqid)
+        result.write(oprot)
+        oprot.writeMessageEnd()
+        oprot.trans.flush()
+
+    def process_getReachable(self, seqid, iprot, oprot):
+        args = getReachable_args()
+        args.read(iprot)
+        iprot.readMessageEnd()
+        result = getReachable_result()
+        try:
+            result.success = self._handler.getReachable()
+            msg_type = TMessageType.REPLY
+        except TTransport.TTransportException:
+            raise
+        except TApplicationException as ex:
+            logging.exception('TApplication exception in handler')
+            msg_type = TMessageType.EXCEPTION
+            result = ex
+        except Exception:
+            logging.exception('Unexpected exception in handler')
+            msg_type = TMessageType.EXCEPTION
+            result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
+        oprot.writeMessageBegin("getReachable", msg_type, seqid)
         result.write(oprot)
         oprot.writeMessageEnd()
         oprot.trans.flush()
@@ -1046,6 +1099,117 @@ getStore_result.thrift_spec = (
 )
 
 
+class getReachable_args(object):
+
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('getReachable_args')
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+all_structs.append(getReachable_args)
+getReachable_args.thrift_spec = (
+)
+
+
+class getReachable_result(object):
+    """
+    Attributes:
+     - success
+    """
+
+
+    def __init__(self, success=None,):
+        self.success = success
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 0:
+                if ftype == TType.SET:
+                    self.success = set()
+                    (_etype21, _size18) = iprot.readSetBegin()
+                    for _i22 in range(_size18):
+                        _elem23 = iprot.readI32()
+                        self.success.add(_elem23)
+                    iprot.readSetEnd()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('getReachable_result')
+        if self.success is not None:
+            oprot.writeFieldBegin('success', TType.SET, 0)
+            oprot.writeSetBegin(TType.I32, len(self.success))
+            for iter24 in self.success:
+                oprot.writeI32(iter24)
+            oprot.writeSetEnd()
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+all_structs.append(getReachable_result)
+getReachable_result.thrift_spec = (
+    (0, TType.SET, 'success', (TType.I32, None, False), None, ),  # 0
+)
+
+
 class write_args(object):
     """
     Attributes:
@@ -1398,10 +1562,10 @@ class smallListen_args(object):
             elif fid == 7:
                 if ftype == TType.SET:
                     self.seen = set()
-                    (_etype21, _size18) = iprot.readSetBegin()
-                    for _i22 in range(_size18):
-                        _elem23 = iprot.readI32()
-                        self.seen.add(_elem23)
+                    (_etype28, _size25) = iprot.readSetBegin()
+                    for _i29 in range(_size25):
+                        _elem30 = iprot.readI32()
+                        self.seen.add(_elem30)
                     iprot.readSetEnd()
                 else:
                     iprot.skip(ftype)
@@ -1447,8 +1611,8 @@ class smallListen_args(object):
         if self.seen is not None:
             oprot.writeFieldBegin('seen', TType.SET, 7)
             oprot.writeSetBegin(TType.I32, len(self.seen))
-            for iter24 in self.seen:
-                oprot.writeI32(iter24)
+            for iter31 in self.seen:
+                oprot.writeI32(iter31)
             oprot.writeSetEnd()
             oprot.writeFieldEnd()
         if self.msg_ts is not None:
@@ -1554,22 +1718,22 @@ class bigListen_args(object):
             if fid == 1:
                 if ftype == TType.MAP:
                     self.loaf = {}
-                    (_ktype26, _vtype27, _size25) = iprot.readMapBegin()
-                    for _i29 in range(_size25):
-                        _key30 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
-                        _val31 = Bread()
-                        _val31.read(iprot)
-                        self.loaf[_key30] = _val31
+                    (_ktype33, _vtype34, _size32) = iprot.readMapBegin()
+                    for _i36 in range(_size32):
+                        _key37 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                        _val38 = Bread()
+                        _val38.read(iprot)
+                        self.loaf[_key37] = _val38
                     iprot.readMapEnd()
                 else:
                     iprot.skip(ftype)
             elif fid == 2:
                 if ftype == TType.SET:
                     self.seen = set()
-                    (_etype35, _size32) = iprot.readSetBegin()
-                    for _i36 in range(_size32):
-                        _elem37 = iprot.readI32()
-                        self.seen.add(_elem37)
+                    (_etype42, _size39) = iprot.readSetBegin()
+                    for _i43 in range(_size39):
+                        _elem44 = iprot.readI32()
+                        self.seen.add(_elem44)
                     iprot.readSetEnd()
                 else:
                     iprot.skip(ftype)
@@ -1591,16 +1755,16 @@ class bigListen_args(object):
         if self.loaf is not None:
             oprot.writeFieldBegin('loaf', TType.MAP, 1)
             oprot.writeMapBegin(TType.STRING, TType.STRUCT, len(self.loaf))
-            for kiter38, viter39 in self.loaf.items():
-                oprot.writeString(kiter38.encode('utf-8') if sys.version_info[0] == 2 else kiter38)
-                viter39.write(oprot)
+            for kiter45, viter46 in self.loaf.items():
+                oprot.writeString(kiter45.encode('utf-8') if sys.version_info[0] == 2 else kiter45)
+                viter46.write(oprot)
             oprot.writeMapEnd()
             oprot.writeFieldEnd()
         if self.seen is not None:
             oprot.writeFieldBegin('seen', TType.SET, 2)
             oprot.writeSetBegin(TType.I32, len(self.seen))
-            for iter40 in self.seen:
-                oprot.writeI32(iter40)
+            for iter47 in self.seen:
+                oprot.writeI32(iter47)
             oprot.writeSetEnd()
             oprot.writeFieldEnd()
         if self.msg_ts is not None:
