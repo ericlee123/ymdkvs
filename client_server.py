@@ -38,6 +38,8 @@ class ClientHandler:
         return id in self.reachable
 
     def removeConnection(self, id):
+        if id not in self.reachable:
+            return id not in self.reachable
         self.reachable.remove(id)
         self.transports[id].close()
         self.stubs.pop(id, None)

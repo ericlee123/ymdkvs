@@ -112,10 +112,13 @@ class Master:
         self.openPort += 1
 
     def killServer(self, id):
-        for _, server in self.stubs.items():
+        for sid, server in self.stubs.items():
+            self.transports[sid].open()
             server.removeConnection(id)
+            self.transports[sid].close()
         self.stubs.pop(id, None)
         self.procs[id].terminate()
+        self.replicas.remove(id)
 
     def joinClient(self, clientID, serverID):
         # start client server

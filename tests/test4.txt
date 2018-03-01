@@ -1,0 +1,12 @@
+joinServer 0
+joinServer 1
+joinServer 2
+joinClient 5 0
+put 5 0 111
+joinServer 3
+joinServer 4
+get 5 0
+put 5 1 000
+get 5 1
+get 5 0
+

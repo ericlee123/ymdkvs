@@ -165,7 +165,17 @@ class ReplicaHandler:
         for server_id in self.reachable:
             dict_vector_clock = self.convertToThriftFormat_vectorClock(self.vector_clock)
             # send anti-entropy request to other replica
+
+            # success = False
+            # while not success:
+            #     try:
+            #         self.transports[server_id][0].open()
+            #         success = True
+            #     except TTransport.TTransportException:
+            #         print '[replica_server {} stabilize] caught TTransportException bitch'.format(self.id)
+            #         pass
             self.transports[server_id][0].open()
+
             anti_entropy_result = self.stubs[server_id].antiEntropyRequest(self.id, dict_vector_clock)
             self.transports[server_id][0].close()
             # process anti-entropy result
@@ -187,7 +197,7 @@ class ReplicaHandler:
         self.stabilize_lock.release()
 
     # Adds the writes that are contained in the parameter new_writes and then
-    # sorts the list of writes and removes duplicates
+    # sorts the list of writes
     def addNewWritesToWriteLog(self, new_writes):
         # add all new writes to this replica's write log
         for write in new_writes:
@@ -195,15 +205,26 @@ class ReplicaHandler:
             self.write_log.append(write)
         # sort write log
         self.write_log = sorted(self.write_log, cmp=compareWriteLogEntries)
-        # remove duplicates
-        for i in range(1, len(self.write_log)):
-            curr = self.write_log[i]
-            prev = self.write_log[i-1]
-            # check if the current entry is a copy of the previous one
-            if curr['accept_time'] == prev['accept_time'] and curr['replica_id'] == prev['replica_id']:
-                # duplicate entry
-                self.write_log.pop(i)
-                i -= 1
+
+    # TODO currently not being called
+    def removeDuplicatesFromSortedWriteLog(self):
+        new_write_log = []
+        pointer1 = 0
+        pointer2 = 1
+        new_write_log.append(self.write_log[0])
+        while pointer2 < len(self.write_log):
+            entry1 = self.write_log[pointer1]
+            entry2 = self.write_log[pointer2]
+            if entry1['accept_time'] == entry2['accept_time'] and entry1['replica_id'] == entry2['replica_id']:
+                # entry2 is a duplicate of entry1, which we have already added
+                # to new_write_log
+                pointer2 += 1
+                pass
+            else:
+                new_write_log.append(entry2)
+                pointer1 += 1
+                pointer2 += 1
+        self.write_log = new_write_log
 
     # Starts from a fresh/empty key value store dict. Runs every write that has
     # ever occurred. Returns resulting key value store dict.
