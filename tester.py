@@ -6,11 +6,11 @@ import time
 from pdb import set_trace
 # from constants import START_MESSAGE
 
-TEST_DIR = 'darshan-tests'
-SOLUTIONS_DIR = 'darshan-tests-solutions'
+# TEST_DIR = 'darshan-tests'
+# SOLUTIONS_DIR = 'darshan-tests-solutions'
 
-# TEST_DIR = 'tests'
-# SOLUTIONS_DIR = 'tests-solutions'
+TEST_DIR = 'tests'
+SOLUTIONS_DIR = 'tests-solutions'
 
 def run_single_test(test_file, sol_file):
     print("Running test {}...".format(test_file))
@@ -41,7 +41,7 @@ def run_single_test(test_file, sol_file):
     return success, error_msg, elapsed_sec
 
 def find_solution_file(test_file):
-    return test_file[:test_file.find('.')] + 'Sol.txt' # '-solution.txt'
+    return test_file[:test_file.find('.')] + '-solution.txt' # Sol.txt
 
 def print_scoreboard(test_files, successes, error_msgs, times):
     success_count = 0
