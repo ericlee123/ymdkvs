@@ -62,7 +62,7 @@ class ReplicaHandler:
         rr = ReadResult()
 
         if key not in self.kv_store:
-            rr.value = "ERR_DEP"
+            rr.value = "ERR_KEY"
             rr.version = -1
         else:
             crumbs = self.kv_store[key][3]

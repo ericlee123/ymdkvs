@@ -1,0 +1,81 @@
+joinServer 0
+joinServer 1
+joinServer 2
+joinServer 3
+joinServer 4
+joinClient 5 0
+put 5 a A
+put 5 b B
+put 5 c C
+put 5 d D
+put 5 e E
+put 5 f F
+put 5 g G
+put 5 i I
+put 5 j J
+put 5 k K
+put 5 l L
+put 5 m M
+put 5 n N
+put 5 o O
+killServer 4
+joinServer 6
+killServer 6
+joinServer 7
+killServer 7
+joinServer 8
+killServer 8
+joinServer 9
+killServer 9
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+joinServer 6
+killServer 6
+stabilize
+joinServer 6
+killServer 6
+stabilize
+printStore 0
+printStore 1
+printStore 2
+printStore 3
