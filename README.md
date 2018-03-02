@@ -21,6 +21,6 @@ pip install thrift
 ```
 After installing thrift, running our code just requires you to do the following.
 ```
-python  master.py < test.txt
+python master.py < test.txt
 ```
 We also have a clean-up script. Eric pls
