@@ -6,6 +6,7 @@ struct ReadResult {
 struct AntiEntropyResult {
     1: list<map<string, string>> new_writes;
     2: map<i32, i32> vector_clock;
+    3: i32 accept_time;
 }
 
 service Replica {

@@ -110,12 +110,6 @@ class ReplicaHandler:
         return self.convertToThriftFormat_vectorClock(self.vector_clock)
 
     def read(self, key, cid, client_vector_clock):
-        # check if key is present in the key-value store in this replica
-        if key not in self.kv_store:
-            rr = ReadResult()
-            rr.value = "ERR_KEY"
-            rr.vector_clock = self.convertToThriftFormat_vectorClock(self.vector_clock)
-            return rr
         # if even one element of the client vector clock is ahead of this
         # replica's vector clock, return ERR_DEP. It's possible that a different
         # replica has more information that this replica is not aware of
@@ -125,6 +119,12 @@ class ReplicaHandler:
                 rr.value = "ERR_DEP"
                 rr.vector_clock = self.convertToThriftFormat_vectorClock(self.vector_clock)
                 return rr
+        # check if key is present in the key-value store in this replica
+        if key not in self.kv_store:
+            rr = ReadResult()
+            rr.value = "ERR_KEY"
+            rr.vector_clock = self.convertToThriftFormat_vectorClock(self.vector_clock)
+            return rr
         # send read result back to requesting client
         rr = ReadResult()
         rr.value = self.kv_store[key]
@@ -148,6 +148,7 @@ class ReplicaHandler:
         response = AntiEntropyResult()
         response.vector_clock = self.convertToThriftFormat_vectorClock(self.vector_clock)
         response.new_writes = new_writes
+        response.accept_time = self.accept_time
         return response
 
     # periodically pings other replicas for updates
@@ -182,6 +183,7 @@ class ReplicaHandler:
             self.lock.acquire()
             new_writes = anti_entropy_result.new_writes
             other_server_vector_clock = anti_entropy_result.vector_clock
+            other_server_accept_time = anti_entropy_result.accept_time
             if len(new_writes) > 0:
                 # add new writes to this server's write log and sort
                 self.addNewWritesToWriteLog(anti_entropy_result.new_writes)
@@ -189,9 +191,14 @@ class ReplicaHandler:
                 # store
                 # TODO might only need to do this at end of loop, think about it
                 self.kv_store = self.processWriteLogHistory()
+                # print '[replica_server {} stabilize] new kv store after writes = {}'.format(self.id, self.kv_store)
             # update this server's vector clock
             for k, v in other_server_vector_clock.iteritems():
                 self.vector_clock[k] = max(self.vector_clock[k], other_server_vector_clock[k])
+            # update this replica's accept_time
+            # print '[replica_server {} stabilize] accept_time before correction = {}'.format(self.id, self.accept_time)
+            self.accept_time = max(self.accept_time, other_server_accept_time)
+            # print '[replica_server {} stabilize] accept_time after correction = {}'.format(self.id, self.accept_time)
             self.lock.release()
         self.reachable_lock.release()
         self.stabilize_lock.release()

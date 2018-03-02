@@ -98,12 +98,14 @@ class AntiEntropyResult(object):
     Attributes:
      - new_writes
      - vector_clock
+     - accept_time
     """
 
 
-    def __init__(self, new_writes=None, vector_clock=None,):
+    def __init__(self, new_writes=None, vector_clock=None, accept_time=None,):
         self.new_writes = new_writes
         self.vector_clock = vector_clock
+        self.accept_time = accept_time
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -141,6 +143,11 @@ class AntiEntropyResult(object):
                     iprot.readMapEnd()
                 else:
                     iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.I32:
+                    self.accept_time = iprot.readI32()
+                else:
+                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -170,6 +177,10 @@ class AntiEntropyResult(object):
                 oprot.writeI32(viter33)
             oprot.writeMapEnd()
             oprot.writeFieldEnd()
+        if self.accept_time is not None:
+            oprot.writeFieldBegin('accept_time', TType.I32, 3)
+            oprot.writeI32(self.accept_time)
+            oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
 
@@ -197,6 +208,7 @@ AntiEntropyResult.thrift_spec = (
     None,  # 0
     (1, TType.LIST, 'new_writes', (TType.MAP, (TType.STRING, 'UTF8', TType.STRING, 'UTF8', False), False), None, ),  # 1
     (2, TType.MAP, 'vector_clock', (TType.I32, None, TType.I32, None, False), None, ),  # 2
+    (3, TType.I32, 'accept_time', None, None, ),  # 3
 )
 fix_spec(all_structs)
 del all_structs

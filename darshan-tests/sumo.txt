@@ -1,0 +1,17 @@
+joinServer 0
+joinServer 1
+joinServer 3
+joinClient 2 0
+joinClient 4 3
+put 2 0 1 
+put 2 0 2
+put 2 0 3
+put 2 0 4
+put 2 0 5
+put 2 0 6
+stabilize
+put 4 0 111
+stabilize
+get 2 0
+get 4 0
+
