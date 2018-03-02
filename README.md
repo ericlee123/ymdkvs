@@ -1,6 +1,6 @@
 # Project 1: Distributed Key-Value Store
-Eric Lee, ejl966, ericlee@cs.utexas.edu
-Sumanth Balaraman, sb47327, sumanth@cs.utexas.edu
+* Eric Lee, ejl966, ericlee@cs.utexas.edu
+* Sumanth Balaraman, sb47327, sumanth@cs.utexas.edu
 
 ## Our Implementation
 ##### Basic Design
