@@ -14,7 +14,6 @@ from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 
-# TODO maybe move this to write log entry class
 # custom comparator to compare entries in the write_log when sorting
 def compareWriteLogEntries(x, y):
     if x['accept_time'] < y['accept_time']:
@@ -43,7 +42,7 @@ class ReplicaHandler:
         self.vector_clock = defaultdict(int)
         self.accept_time = 0
         self.write_log = []
-        # TODO rename
+        # locks things related to the write log
         self.lock = threading.Lock()
         # use lock around iterating through or modifying the reachable set to
         # avoid the following error:
@@ -168,15 +167,6 @@ class ReplicaHandler:
         for server_id in self.reachable:
             dict_vector_clock = self.convertToThriftFormat_vectorClock(self.vector_clock)
             # send anti-entropy request to other replica
-
-            # success = False
-            # while not success:
-            #     try:
-            #         self.transports[server_id][0].open()
-            #         success = True
-            #     except TTransport.TTransportException:
-            #         print '[replica_server {} stabilize] caught TTransportException bitch'.format(self.id)
-            #         pass
             self.transports[server_id][0].open()
             anti_entropy_result = self.stubs[server_id].antiEntropyRequest(self.id, dict_vector_clock)
             self.transports[server_id][0].close()
@@ -187,21 +177,15 @@ class ReplicaHandler:
             other_server_accept_time = anti_entropy_result.accept_time
             if len(new_writes) > 0:
                 # add new writes to this server's write log and sort
-                # print '[replica_server {} stabilize] new writes = {}'.format(self.id, new_writes)
                 self.addNewWritesToWriteLog(anti_entropy_result.new_writes)
-                # print '[replica_server {} stabilize] new write history = {}'.format(self.id, self.write_log)
                 # process full write history to get an up-to-date key-value
                 # store
-                # TODO might only need to do this at end of loop, think about it
                 self.kv_store = self.processWriteLogHistory()
-                # print '[replica_server {} stabilize] new kv store after writes = {}'.format(self.id, self.kv_store)
             # update this server's vector clock
             for k, v in other_server_vector_clock.iteritems():
                 self.vector_clock[k] = max(self.vector_clock[k], other_server_vector_clock[k])
             # update this replica's accept_time
-            # print '[replica_server {} stabilize] accept_time before correction = {}'.format(self.id, self.accept_time)
             self.accept_time = max(self.accept_time, other_server_accept_time)
-            # print '[replica_server {} stabilize] accept_time after correction = {}'.format(self.id, self.accept_time)
             self.lock.release()
         self.reachable_lock.release()
         self.stabilize_lock.release()
@@ -253,26 +237,6 @@ class ReplicaHandler:
             self.write_log.append(write)
         # sort write log
         self.write_log = sorted(self.write_log, cmp=compareWriteLogEntries)
-
-    # TODO currently not being called
-    def removeDuplicatesFromSortedWriteLog(self):
-        new_write_log = []
-        pointer1 = 0
-        pointer2 = 1
-        new_write_log.append(self.write_log[0])
-        while pointer2 < len(self.write_log):
-            entry1 = self.write_log[pointer1]
-            entry2 = self.write_log[pointer2]
-            if entry1['accept_time'] == entry2['accept_time'] and entry1['replica_id'] == entry2['replica_id']:
-                # entry2 is a duplicate of entry1, which we have already added
-                # to new_write_log
-                pointer2 += 1
-                pass
-            else:
-                new_write_log.append(entry2)
-                pointer1 += 1
-                pointer2 += 1
-        self.write_log = new_write_log
 
     # Starts from a fresh/empty key value store dict. Runs every write that has
     # ever occurred. Returns resulting key value store dict.
