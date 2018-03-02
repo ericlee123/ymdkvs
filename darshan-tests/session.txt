@@ -1,0 +1,14 @@
+joinServer 0
+joinServer 1
+joinClient 2 0
+breakConnection 0 1
+stabilize
+put 2 k1 v1
+stabilize
+breakConnection 2 0
+createConnection 2 1
+stabilize
+printStore 0
+printStore 1
+get 2 k1
+

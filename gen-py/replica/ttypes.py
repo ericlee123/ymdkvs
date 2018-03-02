@@ -20,13 +20,13 @@ class ReadResult(object):
     """
     Attributes:
      - value
-     - version
+     - vector_clock
     """
 
 
-    def __init__(self, value=None, version=None,):
+    def __init__(self, value=None, vector_clock=None,):
         self.value = value
-        self.version = version
+        self.vector_clock = vector_clock
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -43,8 +43,14 @@ class ReadResult(object):
                 else:
                     iprot.skip(ftype)
             elif fid == 2:
-                if ftype == TType.I32:
-                    self.version = iprot.readI32()
+                if ftype == TType.MAP:
+                    self.vector_clock = {}
+                    (_ktype1, _vtype2, _size0) = iprot.readMapBegin()
+                    for _i4 in range(_size0):
+                        _key5 = iprot.readI32()
+                        _val6 = iprot.readI32()
+                        self.vector_clock[_key5] = _val6
+                    iprot.readMapEnd()
                 else:
                     iprot.skip(ftype)
             else:
@@ -61,9 +67,13 @@ class ReadResult(object):
             oprot.writeFieldBegin('value', TType.STRING, 1)
             oprot.writeString(self.value.encode('utf-8') if sys.version_info[0] == 2 else self.value)
             oprot.writeFieldEnd()
-        if self.version is not None:
-            oprot.writeFieldBegin('version', TType.I32, 2)
-            oprot.writeI32(self.version)
+        if self.vector_clock is not None:
+            oprot.writeFieldBegin('vector_clock', TType.MAP, 2)
+            oprot.writeMapBegin(TType.I32, TType.I32, len(self.vector_clock))
+            for kiter7, viter8 in self.vector_clock.items():
+                oprot.writeI32(kiter7)
+                oprot.writeI32(viter8)
+            oprot.writeMapEnd()
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -83,21 +93,19 @@ class ReadResult(object):
         return not (self == other)
 
 
-class Bread(object):
+class AntiEntropyResult(object):
     """
     Attributes:
-     - value
-     - kv_ts
-     - rid
-     - crumbs
+     - new_writes
+     - vector_clock
+     - accept_time
     """
 
 
-    def __init__(self, value=None, kv_ts=None, rid=None, crumbs=None,):
-        self.value = value
-        self.kv_ts = kv_ts
-        self.rid = rid
-        self.crumbs = crumbs
+    def __init__(self, new_writes=None, vector_clock=None, accept_time=None,):
+        self.new_writes = new_writes
+        self.vector_clock = vector_clock
+        self.accept_time = accept_time
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -109,29 +117,35 @@ class Bread(object):
             if ftype == TType.STOP:
                 break
             if fid == 1:
-                if ftype == TType.STRING:
-                    self.value = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                if ftype == TType.LIST:
+                    self.new_writes = []
+                    (_etype12, _size9) = iprot.readListBegin()
+                    for _i13 in range(_size9):
+                        _elem14 = {}
+                        (_ktype16, _vtype17, _size15) = iprot.readMapBegin()
+                        for _i19 in range(_size15):
+                            _key20 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                            _val21 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                            _elem14[_key20] = _val21
+                        iprot.readMapEnd()
+                        self.new_writes.append(_elem14)
+                    iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
             elif fid == 2:
-                if ftype == TType.I32:
-                    self.kv_ts = iprot.readI32()
+                if ftype == TType.MAP:
+                    self.vector_clock = {}
+                    (_ktype23, _vtype24, _size22) = iprot.readMapBegin()
+                    for _i26 in range(_size22):
+                        _key27 = iprot.readI32()
+                        _val28 = iprot.readI32()
+                        self.vector_clock[_key27] = _val28
+                    iprot.readMapEnd()
                 else:
                     iprot.skip(ftype)
             elif fid == 3:
                 if ftype == TType.I32:
-                    self.rid = iprot.readI32()
-                else:
-                    iprot.skip(ftype)
-            elif fid == 4:
-                if ftype == TType.MAP:
-                    self.crumbs = {}
-                    (_ktype1, _vtype2, _size0) = iprot.readMapBegin()
-                    for _i4 in range(_size0):
-                        _key5 = iprot.readI32()
-                        _val6 = iprot.readI32()
-                        self.crumbs[_key5] = _val6
-                    iprot.readMapEnd()
+                    self.accept_time = iprot.readI32()
                 else:
                     iprot.skip(ftype)
             else:
@@ -143,26 +157,29 @@ class Bread(object):
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
-        oprot.writeStructBegin('Bread')
-        if self.value is not None:
-            oprot.writeFieldBegin('value', TType.STRING, 1)
-            oprot.writeString(self.value.encode('utf-8') if sys.version_info[0] == 2 else self.value)
+        oprot.writeStructBegin('AntiEntropyResult')
+        if self.new_writes is not None:
+            oprot.writeFieldBegin('new_writes', TType.LIST, 1)
+            oprot.writeListBegin(TType.MAP, len(self.new_writes))
+            for iter29 in self.new_writes:
+                oprot.writeMapBegin(TType.STRING, TType.STRING, len(iter29))
+                for kiter30, viter31 in iter29.items():
+                    oprot.writeString(kiter30.encode('utf-8') if sys.version_info[0] == 2 else kiter30)
+                    oprot.writeString(viter31.encode('utf-8') if sys.version_info[0] == 2 else viter31)
+                oprot.writeMapEnd()
+            oprot.writeListEnd()
             oprot.writeFieldEnd()
-        if self.kv_ts is not None:
-            oprot.writeFieldBegin('kv_ts', TType.I32, 2)
-            oprot.writeI32(self.kv_ts)
-            oprot.writeFieldEnd()
-        if self.rid is not None:
-            oprot.writeFieldBegin('rid', TType.I32, 3)
-            oprot.writeI32(self.rid)
-            oprot.writeFieldEnd()
-        if self.crumbs is not None:
-            oprot.writeFieldBegin('crumbs', TType.MAP, 4)
-            oprot.writeMapBegin(TType.I32, TType.I32, len(self.crumbs))
-            for kiter7, viter8 in self.crumbs.items():
-                oprot.writeI32(kiter7)
-                oprot.writeI32(viter8)
+        if self.vector_clock is not None:
+            oprot.writeFieldBegin('vector_clock', TType.MAP, 2)
+            oprot.writeMapBegin(TType.I32, TType.I32, len(self.vector_clock))
+            for kiter32, viter33 in self.vector_clock.items():
+                oprot.writeI32(kiter32)
+                oprot.writeI32(viter33)
             oprot.writeMapEnd()
+            oprot.writeFieldEnd()
+        if self.accept_time is not None:
+            oprot.writeFieldBegin('accept_time', TType.I32, 3)
+            oprot.writeI32(self.accept_time)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -184,15 +201,14 @@ all_structs.append(ReadResult)
 ReadResult.thrift_spec = (
     None,  # 0
     (1, TType.STRING, 'value', 'UTF8', None, ),  # 1
-    (2, TType.I32, 'version', None, None, ),  # 2
+    (2, TType.MAP, 'vector_clock', (TType.I32, None, TType.I32, None, False), None, ),  # 2
 )
-all_structs.append(Bread)
-Bread.thrift_spec = (
+all_structs.append(AntiEntropyResult)
+AntiEntropyResult.thrift_spec = (
     None,  # 0
-    (1, TType.STRING, 'value', 'UTF8', None, ),  # 1
-    (2, TType.I32, 'kv_ts', None, None, ),  # 2
-    (3, TType.I32, 'rid', None, None, ),  # 3
-    (4, TType.MAP, 'crumbs', (TType.I32, None, TType.I32, None, False), None, ),  # 4
+    (1, TType.LIST, 'new_writes', (TType.MAP, (TType.STRING, 'UTF8', TType.STRING, 'UTF8', False), False), None, ),  # 1
+    (2, TType.MAP, 'vector_clock', (TType.I32, None, TType.I32, None, False), None, ),  # 2
+    (3, TType.I32, 'accept_time', None, None, ),  # 3
 )
 fix_spec(all_structs)
 del all_structs

@@ -1,0 +1,15 @@
+joinServer 0
+joinServer 1
+joinServer 2
+joinClient 3 0
+joinClient 4 1
+joinClient 5 2
+killServer 0
+put 4 k1 v1
+put 5 k2 v2
+stabilize
+get 4 k1
+get 4 k2
+get 5 k1
+get 5 k2
+

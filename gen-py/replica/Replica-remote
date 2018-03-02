@@ -28,11 +28,10 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
     print('  bool addConnection(i32 id, i32 port)')
     print('  bool removeConnection(i32 id)')
     print('   getStore()')
-    print('   getReachable()')
-    print('  void write(string key, string value, i32 cid, i32 version)')
-    print('  ReadResult read(string key, i32 cid, i32 version)')
-    print('  void smallListen(string key, string value, i32 kv_ts, i32 rid, i32 cid, i32 version,  seen, i32 msg_ts)')
-    print('  void bigListen( loaf,  seen, i32 msg_ts)')
+    print('  void stabilize()')
+    print('   write(string key, string value, i32 cid, i32 client_time)')
+    print('  ReadResult read(string key, i32 cid,  vector_clock)')
+    print('  AntiEntropyResult antiEntropyRequest(i32 id,  vector_clock)')
     print('')
     sys.exit(0)
 
@@ -136,11 +135,11 @@ elif cmd == 'getStore':
         sys.exit(1)
     pp.pprint(client.getStore())
 
-elif cmd == 'getReachable':
+elif cmd == 'stabilize':
     if len(args) != 0:
-        print('getReachable requires 0 args')
+        print('stabilize requires 0 args')
         sys.exit(1)
-    pp.pprint(client.getReachable())
+    pp.pprint(client.stabilize())
 
 elif cmd == 'write':
     if len(args) != 4:
@@ -154,17 +153,11 @@ elif cmd == 'read':
         sys.exit(1)
     pp.pprint(client.read(args[0], eval(args[1]), eval(args[2]),))
 
-elif cmd == 'smallListen':
-    if len(args) != 8:
-        print('smallListen requires 8 args')
+elif cmd == 'antiEntropyRequest':
+    if len(args) != 2:
+        print('antiEntropyRequest requires 2 args')
         sys.exit(1)
-    pp.pprint(client.smallListen(args[0], args[1], eval(args[2]), eval(args[3]), eval(args[4]), eval(args[5]), eval(args[6]), eval(args[7]),))
-
-elif cmd == 'bigListen':
-    if len(args) != 3:
-        print('bigListen requires 3 args')
-        sys.exit(1)
-    pp.pprint(client.bigListen(eval(args[0]), eval(args[1]), eval(args[2]),))
+    pp.pprint(client.antiEntropyRequest(eval(args[0]), eval(args[1]),))
 
 else:
     print('Unrecognized method %s' % cmd)

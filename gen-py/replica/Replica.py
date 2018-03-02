@@ -44,48 +44,33 @@ class Iface(object):
     def getStore(self):
         pass
 
-    def getReachable(self):
+    def stabilize(self):
         pass
 
-    def write(self, key, value, cid, version):
+    def write(self, key, value, cid, client_time):
         """
         Parameters:
          - key
          - value
          - cid
-         - version
+         - client_time
         """
         pass
 
-    def read(self, key, cid, version):
+    def read(self, key, cid, vector_clock):
         """
         Parameters:
          - key
          - cid
-         - version
+         - vector_clock
         """
         pass
 
-    def smallListen(self, key, value, kv_ts, rid, cid, version, seen, msg_ts):
+    def antiEntropyRequest(self, id, vector_clock):
         """
         Parameters:
-         - key
-         - value
-         - kv_ts
-         - rid
-         - cid
-         - version
-         - seen
-         - msg_ts
-        """
-        pass
-
-    def bigListen(self, loaf, seen, msg_ts):
-        """
-        Parameters:
-         - loaf
-         - seen
-         - msg_ts
+         - id
+         - vector_clock
         """
         pass
 
@@ -216,18 +201,18 @@ class Client(Iface):
             return result.success
         raise TApplicationException(TApplicationException.MISSING_RESULT, "getStore failed: unknown result")
 
-    def getReachable(self):
-        self.send_getReachable()
-        return self.recv_getReachable()
+    def stabilize(self):
+        self.send_stabilize()
+        self.recv_stabilize()
 
-    def send_getReachable(self):
-        self._oprot.writeMessageBegin('getReachable', TMessageType.CALL, self._seqid)
-        args = getReachable_args()
+    def send_stabilize(self):
+        self._oprot.writeMessageBegin('stabilize', TMessageType.CALL, self._seqid)
+        args = stabilize_args()
         args.write(self._oprot)
         self._oprot.writeMessageEnd()
         self._oprot.trans.flush()
 
-    def recv_getReachable(self):
+    def recv_stabilize(self):
         iprot = self._iprot
         (fname, mtype, rseqid) = iprot.readMessageBegin()
         if mtype == TMessageType.EXCEPTION:
@@ -235,31 +220,29 @@ class Client(Iface):
             x.read(iprot)
             iprot.readMessageEnd()
             raise x
-        result = getReachable_result()
+        result = stabilize_result()
         result.read(iprot)
         iprot.readMessageEnd()
-        if result.success is not None:
-            return result.success
-        raise TApplicationException(TApplicationException.MISSING_RESULT, "getReachable failed: unknown result")
+        return
 
-    def write(self, key, value, cid, version):
+    def write(self, key, value, cid, client_time):
         """
         Parameters:
          - key
          - value
          - cid
-         - version
+         - client_time
         """
-        self.send_write(key, value, cid, version)
-        self.recv_write()
+        self.send_write(key, value, cid, client_time)
+        return self.recv_write()
 
-    def send_write(self, key, value, cid, version):
+    def send_write(self, key, value, cid, client_time):
         self._oprot.writeMessageBegin('write', TMessageType.CALL, self._seqid)
         args = write_args()
         args.key = key
         args.value = value
         args.cid = cid
-        args.version = version
+        args.client_time = client_time
         args.write(self._oprot)
         self._oprot.writeMessageEnd()
         self._oprot.trans.flush()
@@ -275,24 +258,26 @@ class Client(Iface):
         result = write_result()
         result.read(iprot)
         iprot.readMessageEnd()
-        return
+        if result.success is not None:
+            return result.success
+        raise TApplicationException(TApplicationException.MISSING_RESULT, "write failed: unknown result")
 
-    def read(self, key, cid, version):
+    def read(self, key, cid, vector_clock):
         """
         Parameters:
          - key
          - cid
-         - version
+         - vector_clock
         """
-        self.send_read(key, cid, version)
+        self.send_read(key, cid, vector_clock)
         return self.recv_read()
 
-    def send_read(self, key, cid, version):
+    def send_read(self, key, cid, vector_clock):
         self._oprot.writeMessageBegin('read', TMessageType.CALL, self._seqid)
         args = read_args()
         args.key = key
         args.cid = cid
-        args.version = version
+        args.vector_clock = vector_clock
         args.write(self._oprot)
         self._oprot.writeMessageEnd()
         self._oprot.trans.flush()
@@ -312,37 +297,25 @@ class Client(Iface):
             return result.success
         raise TApplicationException(TApplicationException.MISSING_RESULT, "read failed: unknown result")
 
-    def smallListen(self, key, value, kv_ts, rid, cid, version, seen, msg_ts):
+    def antiEntropyRequest(self, id, vector_clock):
         """
         Parameters:
-         - key
-         - value
-         - kv_ts
-         - rid
-         - cid
-         - version
-         - seen
-         - msg_ts
+         - id
+         - vector_clock
         """
-        self.send_smallListen(key, value, kv_ts, rid, cid, version, seen, msg_ts)
-        self.recv_smallListen()
+        self.send_antiEntropyRequest(id, vector_clock)
+        return self.recv_antiEntropyRequest()
 
-    def send_smallListen(self, key, value, kv_ts, rid, cid, version, seen, msg_ts):
-        self._oprot.writeMessageBegin('smallListen', TMessageType.CALL, self._seqid)
-        args = smallListen_args()
-        args.key = key
-        args.value = value
-        args.kv_ts = kv_ts
-        args.rid = rid
-        args.cid = cid
-        args.version = version
-        args.seen = seen
-        args.msg_ts = msg_ts
+    def send_antiEntropyRequest(self, id, vector_clock):
+        self._oprot.writeMessageBegin('antiEntropyRequest', TMessageType.CALL, self._seqid)
+        args = antiEntropyRequest_args()
+        args.id = id
+        args.vector_clock = vector_clock
         args.write(self._oprot)
         self._oprot.writeMessageEnd()
         self._oprot.trans.flush()
 
-    def recv_smallListen(self):
+    def recv_antiEntropyRequest(self):
         iprot = self._iprot
         (fname, mtype, rseqid) = iprot.readMessageBegin()
         if mtype == TMessageType.EXCEPTION:
@@ -350,43 +323,12 @@ class Client(Iface):
             x.read(iprot)
             iprot.readMessageEnd()
             raise x
-        result = smallListen_result()
+        result = antiEntropyRequest_result()
         result.read(iprot)
         iprot.readMessageEnd()
-        return
-
-    def bigListen(self, loaf, seen, msg_ts):
-        """
-        Parameters:
-         - loaf
-         - seen
-         - msg_ts
-        """
-        self.send_bigListen(loaf, seen, msg_ts)
-        self.recv_bigListen()
-
-    def send_bigListen(self, loaf, seen, msg_ts):
-        self._oprot.writeMessageBegin('bigListen', TMessageType.CALL, self._seqid)
-        args = bigListen_args()
-        args.loaf = loaf
-        args.seen = seen
-        args.msg_ts = msg_ts
-        args.write(self._oprot)
-        self._oprot.writeMessageEnd()
-        self._oprot.trans.flush()
-
-    def recv_bigListen(self):
-        iprot = self._iprot
-        (fname, mtype, rseqid) = iprot.readMessageBegin()
-        if mtype == TMessageType.EXCEPTION:
-            x = TApplicationException()
-            x.read(iprot)
-            iprot.readMessageEnd()
-            raise x
-        result = bigListen_result()
-        result.read(iprot)
-        iprot.readMessageEnd()
-        return
+        if result.success is not None:
+            return result.success
+        raise TApplicationException(TApplicationException.MISSING_RESULT, "antiEntropyRequest failed: unknown result")
 
 
 class Processor(Iface, TProcessor):
@@ -397,11 +339,10 @@ class Processor(Iface, TProcessor):
         self._processMap["addConnection"] = Processor.process_addConnection
         self._processMap["removeConnection"] = Processor.process_removeConnection
         self._processMap["getStore"] = Processor.process_getStore
-        self._processMap["getReachable"] = Processor.process_getReachable
+        self._processMap["stabilize"] = Processor.process_stabilize
         self._processMap["write"] = Processor.process_write
         self._processMap["read"] = Processor.process_read
-        self._processMap["smallListen"] = Processor.process_smallListen
-        self._processMap["bigListen"] = Processor.process_bigListen
+        self._processMap["antiEntropyRequest"] = Processor.process_antiEntropyRequest
 
     def process(self, iprot, oprot):
         (name, type, seqid) = iprot.readMessageBegin()
@@ -510,13 +451,13 @@ class Processor(Iface, TProcessor):
         oprot.writeMessageEnd()
         oprot.trans.flush()
 
-    def process_getReachable(self, seqid, iprot, oprot):
-        args = getReachable_args()
+    def process_stabilize(self, seqid, iprot, oprot):
+        args = stabilize_args()
         args.read(iprot)
         iprot.readMessageEnd()
-        result = getReachable_result()
+        result = stabilize_result()
         try:
-            result.success = self._handler.getReachable()
+            self._handler.stabilize()
             msg_type = TMessageType.REPLY
         except TTransport.TTransportException:
             raise
@@ -528,7 +469,7 @@ class Processor(Iface, TProcessor):
             logging.exception('Unexpected exception in handler')
             msg_type = TMessageType.EXCEPTION
             result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
-        oprot.writeMessageBegin("getReachable", msg_type, seqid)
+        oprot.writeMessageBegin("stabilize", msg_type, seqid)
         result.write(oprot)
         oprot.writeMessageEnd()
         oprot.trans.flush()
@@ -539,7 +480,7 @@ class Processor(Iface, TProcessor):
         iprot.readMessageEnd()
         result = write_result()
         try:
-            self._handler.write(args.key, args.value, args.cid, args.version)
+            result.success = self._handler.write(args.key, args.value, args.cid, args.client_time)
             msg_type = TMessageType.REPLY
         except TTransport.TTransportException:
             raise
@@ -562,7 +503,7 @@ class Processor(Iface, TProcessor):
         iprot.readMessageEnd()
         result = read_result()
         try:
-            result.success = self._handler.read(args.key, args.cid, args.version)
+            result.success = self._handler.read(args.key, args.cid, args.vector_clock)
             msg_type = TMessageType.REPLY
         except TTransport.TTransportException:
             raise
@@ -579,13 +520,13 @@ class Processor(Iface, TProcessor):
         oprot.writeMessageEnd()
         oprot.trans.flush()
 
-    def process_smallListen(self, seqid, iprot, oprot):
-        args = smallListen_args()
+    def process_antiEntropyRequest(self, seqid, iprot, oprot):
+        args = antiEntropyRequest_args()
         args.read(iprot)
         iprot.readMessageEnd()
-        result = smallListen_result()
+        result = antiEntropyRequest_result()
         try:
-            self._handler.smallListen(args.key, args.value, args.kv_ts, args.rid, args.cid, args.version, args.seen, args.msg_ts)
+            result.success = self._handler.antiEntropyRequest(args.id, args.vector_clock)
             msg_type = TMessageType.REPLY
         except TTransport.TTransportException:
             raise
@@ -597,30 +538,7 @@ class Processor(Iface, TProcessor):
             logging.exception('Unexpected exception in handler')
             msg_type = TMessageType.EXCEPTION
             result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
-        oprot.writeMessageBegin("smallListen", msg_type, seqid)
-        result.write(oprot)
-        oprot.writeMessageEnd()
-        oprot.trans.flush()
-
-    def process_bigListen(self, seqid, iprot, oprot):
-        args = bigListen_args()
-        args.read(iprot)
-        iprot.readMessageEnd()
-        result = bigListen_result()
-        try:
-            self._handler.bigListen(args.loaf, args.seen, args.msg_ts)
-            msg_type = TMessageType.REPLY
-        except TTransport.TTransportException:
-            raise
-        except TApplicationException as ex:
-            logging.exception('TApplication exception in handler')
-            msg_type = TMessageType.EXCEPTION
-            result = ex
-        except Exception:
-            logging.exception('Unexpected exception in handler')
-            msg_type = TMessageType.EXCEPTION
-            result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
-        oprot.writeMessageBegin("bigListen", msg_type, seqid)
+        oprot.writeMessageBegin("antiEntropyRequest", msg_type, seqid)
         result.write(oprot)
         oprot.writeMessageEnd()
         oprot.trans.flush()
@@ -1051,11 +969,11 @@ class getStore_result(object):
             if fid == 0:
                 if ftype == TType.MAP:
                     self.success = {}
-                    (_ktype10, _vtype11, _size9) = iprot.readMapBegin()
-                    for _i13 in range(_size9):
-                        _key14 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
-                        _val15 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
-                        self.success[_key14] = _val15
+                    (_ktype35, _vtype36, _size34) = iprot.readMapBegin()
+                    for _i38 in range(_size34):
+                        _key39 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                        _val40 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                        self.success[_key39] = _val40
                     iprot.readMapEnd()
                 else:
                     iprot.skip(ftype)
@@ -1072,9 +990,9 @@ class getStore_result(object):
         if self.success is not None:
             oprot.writeFieldBegin('success', TType.MAP, 0)
             oprot.writeMapBegin(TType.STRING, TType.STRING, len(self.success))
-            for kiter16, viter17 in self.success.items():
-                oprot.writeString(kiter16.encode('utf-8') if sys.version_info[0] == 2 else kiter16)
-                oprot.writeString(viter17.encode('utf-8') if sys.version_info[0] == 2 else viter17)
+            for kiter41, viter42 in self.success.items():
+                oprot.writeString(kiter41.encode('utf-8') if sys.version_info[0] == 2 else kiter41)
+                oprot.writeString(viter42.encode('utf-8') if sys.version_info[0] == 2 else viter42)
             oprot.writeMapEnd()
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
@@ -1099,7 +1017,7 @@ getStore_result.thrift_spec = (
 )
 
 
-class getReachable_args(object):
+class stabilize_args(object):
 
 
     def read(self, iprot):
@@ -1120,7 +1038,7 @@ class getReachable_args(object):
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
-        oprot.writeStructBegin('getReachable_args')
+        oprot.writeStructBegin('stabilize_args')
         oprot.writeFieldStop()
         oprot.writeStructEnd()
 
@@ -1137,20 +1055,13 @@ class getReachable_args(object):
 
     def __ne__(self, other):
         return not (self == other)
-all_structs.append(getReachable_args)
-getReachable_args.thrift_spec = (
+all_structs.append(stabilize_args)
+stabilize_args.thrift_spec = (
 )
 
 
-class getReachable_result(object):
-    """
-    Attributes:
-     - success
-    """
+class stabilize_result(object):
 
-
-    def __init__(self, success=None,):
-        self.success = success
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -1161,16 +1072,6 @@ class getReachable_result(object):
             (fname, ftype, fid) = iprot.readFieldBegin()
             if ftype == TType.STOP:
                 break
-            if fid == 0:
-                if ftype == TType.SET:
-                    self.success = set()
-                    (_etype21, _size18) = iprot.readSetBegin()
-                    for _i22 in range(_size18):
-                        _elem23 = iprot.readI32()
-                        self.success.add(_elem23)
-                    iprot.readSetEnd()
-                else:
-                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -1180,14 +1081,7 @@ class getReachable_result(object):
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
-        oprot.writeStructBegin('getReachable_result')
-        if self.success is not None:
-            oprot.writeFieldBegin('success', TType.SET, 0)
-            oprot.writeSetBegin(TType.I32, len(self.success))
-            for iter24 in self.success:
-                oprot.writeI32(iter24)
-            oprot.writeSetEnd()
-            oprot.writeFieldEnd()
+        oprot.writeStructBegin('stabilize_result')
         oprot.writeFieldStop()
         oprot.writeStructEnd()
 
@@ -1204,9 +1098,8 @@ class getReachable_result(object):
 
     def __ne__(self, other):
         return not (self == other)
-all_structs.append(getReachable_result)
-getReachable_result.thrift_spec = (
-    (0, TType.SET, 'success', (TType.I32, None, False), None, ),  # 0
+all_structs.append(stabilize_result)
+stabilize_result.thrift_spec = (
 )
 
 
@@ -1216,15 +1109,15 @@ class write_args(object):
      - key
      - value
      - cid
-     - version
+     - client_time
     """
 
 
-    def __init__(self, key=None, value=None, cid=None, version=None,):
+    def __init__(self, key=None, value=None, cid=None, client_time=None,):
         self.key = key
         self.value = value
         self.cid = cid
-        self.version = version
+        self.client_time = client_time
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -1252,7 +1145,7 @@ class write_args(object):
                     iprot.skip(ftype)
             elif fid == 4:
                 if ftype == TType.I32:
-                    self.version = iprot.readI32()
+                    self.client_time = iprot.readI32()
                 else:
                     iprot.skip(ftype)
             else:
@@ -1277,9 +1170,9 @@ class write_args(object):
             oprot.writeFieldBegin('cid', TType.I32, 3)
             oprot.writeI32(self.cid)
             oprot.writeFieldEnd()
-        if self.version is not None:
-            oprot.writeFieldBegin('version', TType.I32, 4)
-            oprot.writeI32(self.version)
+        if self.client_time is not None:
+            oprot.writeFieldBegin('client_time', TType.I32, 4)
+            oprot.writeI32(self.client_time)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -1303,12 +1196,19 @@ write_args.thrift_spec = (
     (1, TType.STRING, 'key', 'UTF8', None, ),  # 1
     (2, TType.STRING, 'value', 'UTF8', None, ),  # 2
     (3, TType.I32, 'cid', None, None, ),  # 3
-    (4, TType.I32, 'version', None, None, ),  # 4
+    (4, TType.I32, 'client_time', None, None, ),  # 4
 )
 
 
 class write_result(object):
+    """
+    Attributes:
+     - success
+    """
 
+
+    def __init__(self, success=None,):
+        self.success = success
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -1319,6 +1219,17 @@ class write_result(object):
             (fname, ftype, fid) = iprot.readFieldBegin()
             if ftype == TType.STOP:
                 break
+            if fid == 0:
+                if ftype == TType.MAP:
+                    self.success = {}
+                    (_ktype44, _vtype45, _size43) = iprot.readMapBegin()
+                    for _i47 in range(_size43):
+                        _key48 = iprot.readI32()
+                        _val49 = iprot.readI32()
+                        self.success[_key48] = _val49
+                    iprot.readMapEnd()
+                else:
+                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -1329,6 +1240,14 @@ class write_result(object):
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
         oprot.writeStructBegin('write_result')
+        if self.success is not None:
+            oprot.writeFieldBegin('success', TType.MAP, 0)
+            oprot.writeMapBegin(TType.I32, TType.I32, len(self.success))
+            for kiter50, viter51 in self.success.items():
+                oprot.writeI32(kiter50)
+                oprot.writeI32(viter51)
+            oprot.writeMapEnd()
+            oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
 
@@ -1347,6 +1266,7 @@ class write_result(object):
         return not (self == other)
 all_structs.append(write_result)
 write_result.thrift_spec = (
+    (0, TType.MAP, 'success', (TType.I32, None, TType.I32, None, False), None, ),  # 0
 )
 
 
@@ -1355,14 +1275,14 @@ class read_args(object):
     Attributes:
      - key
      - cid
-     - version
+     - vector_clock
     """
 
 
-    def __init__(self, key=None, cid=None, version=None,):
+    def __init__(self, key=None, cid=None, vector_clock=None,):
         self.key = key
         self.cid = cid
-        self.version = version
+        self.vector_clock = vector_clock
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -1384,8 +1304,14 @@ class read_args(object):
                 else:
                     iprot.skip(ftype)
             elif fid == 3:
-                if ftype == TType.I32:
-                    self.version = iprot.readI32()
+                if ftype == TType.MAP:
+                    self.vector_clock = {}
+                    (_ktype53, _vtype54, _size52) = iprot.readMapBegin()
+                    for _i56 in range(_size52):
+                        _key57 = iprot.readI32()
+                        _val58 = iprot.readI32()
+                        self.vector_clock[_key57] = _val58
+                    iprot.readMapEnd()
                 else:
                     iprot.skip(ftype)
             else:
@@ -1406,9 +1332,13 @@ class read_args(object):
             oprot.writeFieldBegin('cid', TType.I32, 2)
             oprot.writeI32(self.cid)
             oprot.writeFieldEnd()
-        if self.version is not None:
-            oprot.writeFieldBegin('version', TType.I32, 3)
-            oprot.writeI32(self.version)
+        if self.vector_clock is not None:
+            oprot.writeFieldBegin('vector_clock', TType.MAP, 3)
+            oprot.writeMapBegin(TType.I32, TType.I32, len(self.vector_clock))
+            for kiter59, viter60 in self.vector_clock.items():
+                oprot.writeI32(kiter59)
+                oprot.writeI32(viter60)
+            oprot.writeMapEnd()
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -1431,7 +1361,7 @@ read_args.thrift_spec = (
     None,  # 0
     (1, TType.STRING, 'key', 'UTF8', None, ),  # 1
     (2, TType.I32, 'cid', None, None, ),  # 2
-    (3, TType.I32, 'version', None, None, ),  # 3
+    (3, TType.MAP, 'vector_clock', (TType.I32, None, TType.I32, None, False), None, ),  # 3
 )
 
 
@@ -1496,29 +1426,17 @@ read_result.thrift_spec = (
 )
 
 
-class smallListen_args(object):
+class antiEntropyRequest_args(object):
     """
     Attributes:
-     - key
-     - value
-     - kv_ts
-     - rid
-     - cid
-     - version
-     - seen
-     - msg_ts
+     - id
+     - vector_clock
     """
 
 
-    def __init__(self, key=None, value=None, kv_ts=None, rid=None, cid=None, version=None, seen=None, msg_ts=None,):
-        self.key = key
-        self.value = value
-        self.kv_ts = kv_ts
-        self.rid = rid
-        self.cid = cid
-        self.version = version
-        self.seen = seen
-        self.msg_ts = msg_ts
+    def __init__(self, id=None, vector_clock=None,):
+        self.id = id
+        self.vector_clock = vector_clock
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -1530,218 +1448,21 @@ class smallListen_args(object):
             if ftype == TType.STOP:
                 break
             if fid == 1:
-                if ftype == TType.STRING:
-                    self.key = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                if ftype == TType.I32:
+                    self.id = iprot.readI32()
                 else:
                     iprot.skip(ftype)
             elif fid == 2:
-                if ftype == TType.STRING:
-                    self.value = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
-                else:
-                    iprot.skip(ftype)
-            elif fid == 3:
-                if ftype == TType.I32:
-                    self.kv_ts = iprot.readI32()
-                else:
-                    iprot.skip(ftype)
-            elif fid == 4:
-                if ftype == TType.I32:
-                    self.rid = iprot.readI32()
-                else:
-                    iprot.skip(ftype)
-            elif fid == 5:
-                if ftype == TType.I32:
-                    self.cid = iprot.readI32()
-                else:
-                    iprot.skip(ftype)
-            elif fid == 6:
-                if ftype == TType.I32:
-                    self.version = iprot.readI32()
-                else:
-                    iprot.skip(ftype)
-            elif fid == 7:
-                if ftype == TType.SET:
-                    self.seen = set()
-                    (_etype28, _size25) = iprot.readSetBegin()
-                    for _i29 in range(_size25):
-                        _elem30 = iprot.readI32()
-                        self.seen.add(_elem30)
-                    iprot.readSetEnd()
-                else:
-                    iprot.skip(ftype)
-            elif fid == 8:
-                if ftype == TType.I32:
-                    self.msg_ts = iprot.readI32()
-                else:
-                    iprot.skip(ftype)
-            else:
-                iprot.skip(ftype)
-            iprot.readFieldEnd()
-        iprot.readStructEnd()
-
-    def write(self, oprot):
-        if oprot._fast_encode is not None and self.thrift_spec is not None:
-            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
-            return
-        oprot.writeStructBegin('smallListen_args')
-        if self.key is not None:
-            oprot.writeFieldBegin('key', TType.STRING, 1)
-            oprot.writeString(self.key.encode('utf-8') if sys.version_info[0] == 2 else self.key)
-            oprot.writeFieldEnd()
-        if self.value is not None:
-            oprot.writeFieldBegin('value', TType.STRING, 2)
-            oprot.writeString(self.value.encode('utf-8') if sys.version_info[0] == 2 else self.value)
-            oprot.writeFieldEnd()
-        if self.kv_ts is not None:
-            oprot.writeFieldBegin('kv_ts', TType.I32, 3)
-            oprot.writeI32(self.kv_ts)
-            oprot.writeFieldEnd()
-        if self.rid is not None:
-            oprot.writeFieldBegin('rid', TType.I32, 4)
-            oprot.writeI32(self.rid)
-            oprot.writeFieldEnd()
-        if self.cid is not None:
-            oprot.writeFieldBegin('cid', TType.I32, 5)
-            oprot.writeI32(self.cid)
-            oprot.writeFieldEnd()
-        if self.version is not None:
-            oprot.writeFieldBegin('version', TType.I32, 6)
-            oprot.writeI32(self.version)
-            oprot.writeFieldEnd()
-        if self.seen is not None:
-            oprot.writeFieldBegin('seen', TType.SET, 7)
-            oprot.writeSetBegin(TType.I32, len(self.seen))
-            for iter31 in self.seen:
-                oprot.writeI32(iter31)
-            oprot.writeSetEnd()
-            oprot.writeFieldEnd()
-        if self.msg_ts is not None:
-            oprot.writeFieldBegin('msg_ts', TType.I32, 8)
-            oprot.writeI32(self.msg_ts)
-            oprot.writeFieldEnd()
-        oprot.writeFieldStop()
-        oprot.writeStructEnd()
-
-    def validate(self):
-        return
-
-    def __repr__(self):
-        L = ['%s=%r' % (key, value)
-             for key, value in self.__dict__.items()]
-        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
-
-    def __eq__(self, other):
-        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
-
-    def __ne__(self, other):
-        return not (self == other)
-all_structs.append(smallListen_args)
-smallListen_args.thrift_spec = (
-    None,  # 0
-    (1, TType.STRING, 'key', 'UTF8', None, ),  # 1
-    (2, TType.STRING, 'value', 'UTF8', None, ),  # 2
-    (3, TType.I32, 'kv_ts', None, None, ),  # 3
-    (4, TType.I32, 'rid', None, None, ),  # 4
-    (5, TType.I32, 'cid', None, None, ),  # 5
-    (6, TType.I32, 'version', None, None, ),  # 6
-    (7, TType.SET, 'seen', (TType.I32, None, False), None, ),  # 7
-    (8, TType.I32, 'msg_ts', None, None, ),  # 8
-)
-
-
-class smallListen_result(object):
-
-
-    def read(self, iprot):
-        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
-            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
-            return
-        iprot.readStructBegin()
-        while True:
-            (fname, ftype, fid) = iprot.readFieldBegin()
-            if ftype == TType.STOP:
-                break
-            else:
-                iprot.skip(ftype)
-            iprot.readFieldEnd()
-        iprot.readStructEnd()
-
-    def write(self, oprot):
-        if oprot._fast_encode is not None and self.thrift_spec is not None:
-            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
-            return
-        oprot.writeStructBegin('smallListen_result')
-        oprot.writeFieldStop()
-        oprot.writeStructEnd()
-
-    def validate(self):
-        return
-
-    def __repr__(self):
-        L = ['%s=%r' % (key, value)
-             for key, value in self.__dict__.items()]
-        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
-
-    def __eq__(self, other):
-        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
-
-    def __ne__(self, other):
-        return not (self == other)
-all_structs.append(smallListen_result)
-smallListen_result.thrift_spec = (
-)
-
-
-class bigListen_args(object):
-    """
-    Attributes:
-     - loaf
-     - seen
-     - msg_ts
-    """
-
-
-    def __init__(self, loaf=None, seen=None, msg_ts=None,):
-        self.loaf = loaf
-        self.seen = seen
-        self.msg_ts = msg_ts
-
-    def read(self, iprot):
-        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
-            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
-            return
-        iprot.readStructBegin()
-        while True:
-            (fname, ftype, fid) = iprot.readFieldBegin()
-            if ftype == TType.STOP:
-                break
-            if fid == 1:
                 if ftype == TType.MAP:
-                    self.loaf = {}
-                    (_ktype33, _vtype34, _size32) = iprot.readMapBegin()
-                    for _i36 in range(_size32):
-                        _key37 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
-                        _val38 = Bread()
-                        _val38.read(iprot)
-                        self.loaf[_key37] = _val38
+                    self.vector_clock = {}
+                    (_ktype62, _vtype63, _size61) = iprot.readMapBegin()
+                    for _i65 in range(_size61):
+                        _key66 = iprot.readI32()
+                        _val67 = iprot.readI32()
+                        self.vector_clock[_key66] = _val67
                     iprot.readMapEnd()
                 else:
                     iprot.skip(ftype)
-            elif fid == 2:
-                if ftype == TType.SET:
-                    self.seen = set()
-                    (_etype42, _size39) = iprot.readSetBegin()
-                    for _i43 in range(_size39):
-                        _elem44 = iprot.readI32()
-                        self.seen.add(_elem44)
-                    iprot.readSetEnd()
-                else:
-                    iprot.skip(ftype)
-            elif fid == 3:
-                if ftype == TType.I32:
-                    self.msg_ts = iprot.readI32()
-                else:
-                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -1751,25 +1472,18 @@ class bigListen_args(object):
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
-        oprot.writeStructBegin('bigListen_args')
-        if self.loaf is not None:
-            oprot.writeFieldBegin('loaf', TType.MAP, 1)
-            oprot.writeMapBegin(TType.STRING, TType.STRUCT, len(self.loaf))
-            for kiter45, viter46 in self.loaf.items():
-                oprot.writeString(kiter45.encode('utf-8') if sys.version_info[0] == 2 else kiter45)
-                viter46.write(oprot)
+        oprot.writeStructBegin('antiEntropyRequest_args')
+        if self.id is not None:
+            oprot.writeFieldBegin('id', TType.I32, 1)
+            oprot.writeI32(self.id)
+            oprot.writeFieldEnd()
+        if self.vector_clock is not None:
+            oprot.writeFieldBegin('vector_clock', TType.MAP, 2)
+            oprot.writeMapBegin(TType.I32, TType.I32, len(self.vector_clock))
+            for kiter68, viter69 in self.vector_clock.items():
+                oprot.writeI32(kiter68)
+                oprot.writeI32(viter69)
             oprot.writeMapEnd()
-            oprot.writeFieldEnd()
-        if self.seen is not None:
-            oprot.writeFieldBegin('seen', TType.SET, 2)
-            oprot.writeSetBegin(TType.I32, len(self.seen))
-            for iter47 in self.seen:
-                oprot.writeI32(iter47)
-            oprot.writeSetEnd()
-            oprot.writeFieldEnd()
-        if self.msg_ts is not None:
-            oprot.writeFieldBegin('msg_ts', TType.I32, 3)
-            oprot.writeI32(self.msg_ts)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -1787,17 +1501,23 @@ class bigListen_args(object):
 
     def __ne__(self, other):
         return not (self == other)
-all_structs.append(bigListen_args)
-bigListen_args.thrift_spec = (
+all_structs.append(antiEntropyRequest_args)
+antiEntropyRequest_args.thrift_spec = (
     None,  # 0
-    (1, TType.MAP, 'loaf', (TType.STRING, 'UTF8', TType.STRUCT, [Bread, None], False), None, ),  # 1
-    (2, TType.SET, 'seen', (TType.I32, None, False), None, ),  # 2
-    (3, TType.I32, 'msg_ts', None, None, ),  # 3
+    (1, TType.I32, 'id', None, None, ),  # 1
+    (2, TType.MAP, 'vector_clock', (TType.I32, None, TType.I32, None, False), None, ),  # 2
 )
 
 
-class bigListen_result(object):
+class antiEntropyRequest_result(object):
+    """
+    Attributes:
+     - success
+    """
 
+
+    def __init__(self, success=None,):
+        self.success = success
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -1808,6 +1528,12 @@ class bigListen_result(object):
             (fname, ftype, fid) = iprot.readFieldBegin()
             if ftype == TType.STOP:
                 break
+            if fid == 0:
+                if ftype == TType.STRUCT:
+                    self.success = AntiEntropyResult()
+                    self.success.read(iprot)
+                else:
+                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -1817,7 +1543,11 @@ class bigListen_result(object):
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
-        oprot.writeStructBegin('bigListen_result')
+        oprot.writeStructBegin('antiEntropyRequest_result')
+        if self.success is not None:
+            oprot.writeFieldBegin('success', TType.STRUCT, 0)
+            self.success.write(oprot)
+            oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
 
@@ -1834,8 +1564,9 @@ class bigListen_result(object):
 
     def __ne__(self, other):
         return not (self == other)
-all_structs.append(bigListen_result)
-bigListen_result.thrift_spec = (
+all_structs.append(antiEntropyRequest_result)
+antiEntropyRequest_result.thrift_spec = (
+    (0, TType.STRUCT, 'success', [AntiEntropyResult, None], None, ),  # 0
 )
 fix_spec(all_structs)
 del all_structs

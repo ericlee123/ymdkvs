@@ -32,3 +32,4 @@ joinServer 4
 stabilize
 printStore 1
 printStore 2
+

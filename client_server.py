@@ -18,6 +18,8 @@ class ClientHandler:
         self.reachable = set()
         self.stubs = dict()
         self.transports = dict()
+        self.key_vectorclock_map = dict()
+        self.time = 0
 
     def setID(self, id):
         self.id = id
@@ -28,45 +30,44 @@ class ClientHandler:
         protocol = TBinaryProtocol.TBinaryProtocol(transport)
         replica = Replica.Client(protocol)
 
+        transport.open()
         self.reachable.add(id)
         self.stubs[id] = replica
         self.transports[id] = transport
+        transport.close()
 
         return id in self.reachable
 
     def removeConnection(self, id):
-        self.reachable.discard(id)
+        if id not in self.reachable:
+            return id not in self.reachable
+        self.reachable.remove(id)
+        self.transports[id].close()
         self.stubs.pop(id, None)
-        self.transports.pop(id, None)
         return id not in self.reachable
 
     def requestWrite(self, key, value):
         rid = random.sample(self.reachable, 1)[0]
-        version = -1
-        if key not in self.last_seen:
-            self.last_seen[key] = 0
-        else:
-            self.last_seen[key] += 1
-        version = self.last_seen[key]
-
+        vector_clock = {}
+        if key in self.key_vectorclock_map:
+            vector_clock = self.key_vectorclock_map[key]
         self.transports[rid].open()
-        self.stubs[rid].write(key, value, self.id, version)
+        new_vector_clock = self.stubs[rid].write(key, value, self.id, self.time)
+        self.key_vectorclock_map[key] = new_vector_clock
         self.transports[rid].close()
+        self.time += 1
 
     def requestRead(self, key):
         rid = random.sample(self.reachable, 1)[0]
-        if key not in self.last_seen:
-            self.last_seen[key] = 0
-        version = self.last_seen[key]
-
+        vector_clock = {}
+        if key in self.key_vectorclock_map:
+            vector_clock = self.key_vectorclock_map[key]
         self.transports[rid].open()
-        rr = self.stubs[rid].read(key, self.id, version)
+        read_result = self.stubs[rid].read(key, self.id, vector_clock)
+        if read_result.value != 'ERR_DEP' and read_result.value != 'ERR_KEY':
+            # update client's vector clock for this key if the result was not
+            # some kind of error
+            self.key_vectorclock_map[key] = read_result.vector_clock
         self.transports[rid].close()
-
-        if rr.version < version:
-            print "ERRROR: session guarantees violated (" + str(rr.version) + " < " + str(version) + ")"
-            return "ERR_DEP"
-
-        self.last_seen[key] = rr.version
-
-        return rr.value
+        # return value to master
+        return read_result.value

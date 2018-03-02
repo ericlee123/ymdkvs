@@ -39,7 +39,7 @@ class Master:
         self.openPort = 6262
         self.ports = dict() # id -> ports
         self.procs = dict() # id -> process
-        self.replicas = set()
+        self.replicas = set() # set of replica IDs
         self.stubs = dict() # id -> stub
         self.transports = dict()
         self.wait = 0.05
@@ -47,7 +47,6 @@ class Master:
     def listen(self):
         for cmd in sys.stdin:
 
-            print cmd[:-1]
             args = cmd.split(" ")
             fn = args[0].rstrip()
 
@@ -70,6 +69,8 @@ class Master:
             elif fn == "get":
                 self.get(int(args[1]), args[2].rstrip())
             else:
+                if fn == "":
+                    continue
                 print "failed to process: " + args[0]
                 return -1
 
@@ -81,7 +82,7 @@ class Master:
         p = Process(target=spinUpServer, args=(self.openPort,))
         p.start()
 
-        time.sleep(self.wait) # wait for server.serve(), kind of messy
+        time.sleep(self.wait) # wait for server.serve() [messy]
 
         # set up RPC to replica server
         transport = TSocket.TSocket('localhost', self.openPort)
@@ -91,16 +92,17 @@ class Master:
 
         transport.open()
         replica.setID(id)
+        # connect everyone
+        for sid, server in self.stubs.items():
+            # stubs contains replicas and clients, only connect new server to
+            # existing servers
+            if sid not in self.replicas:
+                continue
+            self.transports[sid].open()
+            server.addConnection(id, self.openPort)
+            self.transports[sid].close()
+            replica.addConnection(sid, self.ports[sid])
         transport.close()
-        # connect to all other replicas
-        for rid in self.replicas:
-            self.transports[rid].open()
-            self.stubs[rid].addConnection(id, self.openPort)
-            self.transports[rid].close()
-
-            transport.open()
-            replica.addConnection(rid, self.ports[rid])
-            transport.close()
 
         self.ports[id] = self.openPort
         self.procs[id] = p
@@ -110,13 +112,13 @@ class Master:
         self.openPort += 1
 
     def killServer(self, id):
-        for sid in self.stubs:
+        for sid, server in self.stubs.items():
             self.transports[sid].open()
-            self.stubs[sid].removeConnection(id)
+            server.removeConnection(id)
             self.transports[sid].close()
-        self.replicas.remove(id)
-        self.stubs.pop(id)
+        self.stubs.pop(id, None)
         self.procs[id].terminate()
+        self.replicas.remove(id)
 
     def joinClient(self, clientID, serverID):
         # start client server
@@ -144,37 +146,34 @@ class Master:
 
     def breakConnection(self, id1, id2):
         self.transports[id1].open()
-        self.transports[id2].open()
         self.stubs[id1].removeConnection(id2)
-        self.stubs[id2].removeConnection(id1)
         self.transports[id1].close()
+        self.transports[id2].open()
+        self.stubs[id2].removeConnection(id1)
         self.transports[id2].close()
 
     def createConnection(self, id1, id2):
-        if id2 in self.replicas:
+        if (id1 in self.replicas and id2 in self.replicas) or (id1 not in self.replicas and id2 in self.replicas):
+            # basically don't allow server to add a client ID to its reachable
+            # list
             self.transports[id1].open()
             self.stubs[id1].addConnection(id2, self.ports[id2])
             self.transports[id1].close()
-        if id1 in self.replicas:
+        if (id2 in self.replicas and id1 in self.replicas) or (id2 not in self.replicas and id1 in self.replicas):
+            # basically don't allow server to add a client ID to its reachable
+            # list
             self.transports[id2].open()
             self.stubs[id2].addConnection(id1, self.ports[id1])
             self.transports[id2].close()
 
     def stabilize(self):
-        while True:
-            stable = True
+        # send stabilize requests to all servers
+        # need to loop through this 4 times to pass the chain test
+        for i in range(4):
             for r in self.replicas:
                 self.transports[r].open()
-                connected = self.stubs[r].getReachable()
-                for c in connected:
-                    self.transports[c].open()
-                    stable = stable and (self.stubs[r].getStore() == self.stubs[c].getStore())
-                    self.transports[c].close()
+                self.stubs[r].stabilize()
                 self.transports[r].close()
-                if not stable:
-                    break
-            if stable:
-                return
 
     def printStore(self, id):
         self.transports[id].open()

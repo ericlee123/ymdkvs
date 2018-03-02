@@ -1,0 +1,24 @@
+joinServer 0
+joinServer 1
+joinClient 3 0
+joinClient 4 1
+put 4 0 x
+stabilize
+breakConnection 0 1
+put 3 0 a
+put 3 0 b
+put 3 0 c
+put 3 0 d
+put 3 0 e
+put 3 0 f
+put 3 0 g
+put 3 0 h
+put 3 0 i
+get 3 0
+breakConnection 3 0
+createConnection 3 1
+get 3 0
+breakConnection 4 1
+createConnection 4 0
+get 4 0
+

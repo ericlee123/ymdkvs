@@ -1,0 +1,8 @@
+joinServer 0
+joinClient 1 0
+joinClient 2 0
+put 1 k1 v1
+put 2 k1 v2
+get 1 k1
+get 2 k1
+

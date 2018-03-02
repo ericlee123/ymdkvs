@@ -1,37 +1,52 @@
 struct ReadResult {
     1: string value;
-    2: i32 version;
+    2: map<i32, i32> vector_clock;
 }
 
-struct Bread {
-    1: string value;
-    2: i32 kv_ts;
-    3: i32 rid;
-    4: map<i32, i32> crumbs; # cid -> version
+struct AntiEntropyResult {
+    1: list<map<string, string>> new_writes;
+    2: map<i32, i32> vector_clock;
+    3: i32 accept_time;
 }
 
 service Replica {
-    # facing master
+    # master -----------------------------------------------------------------------------------------------------
+    # functions that master will call
+
     void setID(1: i32 id);
+
     bool addConnection(1: i32 id, 2: i32 port);
+
     bool removeConnection(1: i32 id);
+
     map<string, string> getStore();
-    set<i32> getReachable();
 
-    # facing client
-    void write(1: string key, 2: string value, 3: i32 cid, 4: i32 version);
-    ReadResult read(1: string key, 2: i32 cid, 3: i32 version);
+    void stabilize();
 
-    # facing replica
-    void smallListen(1: string key,
-                     2: string value,
-                     3: i32 kv_ts,
-                     4: i32 rid,
-                     5: i32 cid,
-                     6: i32 version,
-                     7: set<i32> seen,
-                     8: i32 msg_ts);
-    void bigListen(1: map<string, Bread> loaf,
-                   2: set<i32> seen,
-                   3: i32 msg_ts);
+    # client -----------------------------------------------------------------------------------------------------
+    # functions that clients will call
+
+    # returns the replica's vector clock
+    map<i32, i32> write(
+        1: string key,
+        2: string value,
+        3: i32 cid
+        4: i32 client_time
+    );
+
+    ReadResult read(
+        1: string key,
+        2: i32 cid,
+        3: map<i32, i32> vector_clock
+    );
+
+    # replica ----------------------------------------------------------------------------------------------------
+    # functions that other replicas will call
+
+    AntiEntropyResult antiEntropyRequest(
+        1: i32 id,
+        2: map<i32, i32> vector_clock
+    );
+
+    # ------------------------------------------------------------------------------------------------------------
 }
