@@ -9,6 +9,9 @@ from pdb import set_trace
 TEST_DIR = 'darshan-tests'
 SOLUTIONS_DIR = 'darshan-tests-solutions'
 
+# TEST_DIR = 'tests'
+# SOLUTIONS_DIR = 'tests-solutions'
+
 def run_single_test(test_file, sol_file):
     print("Running test {}...".format(test_file))
     # Check test file ends with blank line.
@@ -27,7 +30,7 @@ def run_single_test(test_file, sol_file):
         success = (output == "")
         error_msg = None
         if not success:
-            error_msg = "Non-empty output: {}".format(output)
+            error_msg = "\nNon-empty output: \n{}".format(output)
         return success, error_msg, elapsed_sec
     solution = "".join(open(sol_file, 'r').readlines())
     success = (solution.rstrip() == output.rstrip())

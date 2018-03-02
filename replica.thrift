@@ -31,6 +31,7 @@ service Replica {
         1: string key,
         2: string value,
         3: i32 cid
+        4: i32 client_time
     );
 
     ReadResult read(

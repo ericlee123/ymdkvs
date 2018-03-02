@@ -47,12 +47,13 @@ class Iface(object):
     def stabilize(self):
         pass
 
-    def write(self, key, value, cid):
+    def write(self, key, value, cid, client_time):
         """
         Parameters:
          - key
          - value
          - cid
+         - client_time
         """
         pass
 
@@ -224,22 +225,24 @@ class Client(Iface):
         iprot.readMessageEnd()
         return
 
-    def write(self, key, value, cid):
+    def write(self, key, value, cid, client_time):
         """
         Parameters:
          - key
          - value
          - cid
+         - client_time
         """
-        self.send_write(key, value, cid)
+        self.send_write(key, value, cid, client_time)
         return self.recv_write()
 
-    def send_write(self, key, value, cid):
+    def send_write(self, key, value, cid, client_time):
         self._oprot.writeMessageBegin('write', TMessageType.CALL, self._seqid)
         args = write_args()
         args.key = key
         args.value = value
         args.cid = cid
+        args.client_time = client_time
         args.write(self._oprot)
         self._oprot.writeMessageEnd()
         self._oprot.trans.flush()
@@ -477,7 +480,7 @@ class Processor(Iface, TProcessor):
         iprot.readMessageEnd()
         result = write_result()
         try:
-            result.success = self._handler.write(args.key, args.value, args.cid)
+            result.success = self._handler.write(args.key, args.value, args.cid, args.client_time)
             msg_type = TMessageType.REPLY
         except TTransport.TTransportException:
             raise
@@ -1106,13 +1109,15 @@ class write_args(object):
      - key
      - value
      - cid
+     - client_time
     """
 
 
-    def __init__(self, key=None, value=None, cid=None,):
+    def __init__(self, key=None, value=None, cid=None, client_time=None,):
         self.key = key
         self.value = value
         self.cid = cid
+        self.client_time = client_time
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -1138,6 +1143,11 @@ class write_args(object):
                     self.cid = iprot.readI32()
                 else:
                     iprot.skip(ftype)
+            elif fid == 4:
+                if ftype == TType.I32:
+                    self.client_time = iprot.readI32()
+                else:
+                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -1159,6 +1169,10 @@ class write_args(object):
         if self.cid is not None:
             oprot.writeFieldBegin('cid', TType.I32, 3)
             oprot.writeI32(self.cid)
+            oprot.writeFieldEnd()
+        if self.client_time is not None:
+            oprot.writeFieldBegin('client_time', TType.I32, 4)
+            oprot.writeI32(self.client_time)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -1182,6 +1196,7 @@ write_args.thrift_spec = (
     (1, TType.STRING, 'key', 'UTF8', None, ),  # 1
     (2, TType.STRING, 'value', 'UTF8', None, ),  # 2
     (3, TType.I32, 'cid', None, None, ),  # 3
+    (4, TType.I32, 'client_time', None, None, ),  # 4
 )
 
 

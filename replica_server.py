@@ -96,13 +96,15 @@ class ReplicaHandler:
             bread[key] = value
         return bread
 
-    def write(self, key, value, cid):
+    def write(self, key, value, cid, client_time):
         # add this write to the write log
         self.write_log.append({
             'key': key,
             'value': value,
             'accept_time': self.accept_time,
             'replica_id': self.id, # ID of the server that accepted this write
+            'client_id': cid,
+            'client_time': client_time,
         })
         self.kv_store[key] = value
         self.accept_time += 1
@@ -176,7 +178,6 @@ class ReplicaHandler:
             #         print '[replica_server {} stabilize] caught TTransportException bitch'.format(self.id)
             #         pass
             self.transports[server_id][0].open()
-
             anti_entropy_result = self.stubs[server_id].antiEntropyRequest(self.id, dict_vector_clock)
             self.transports[server_id][0].close()
             # process anti-entropy result
@@ -186,7 +187,9 @@ class ReplicaHandler:
             other_server_accept_time = anti_entropy_result.accept_time
             if len(new_writes) > 0:
                 # add new writes to this server's write log and sort
+                # print '[replica_server {} stabilize] new writes = {}'.format(self.id, new_writes)
                 self.addNewWritesToWriteLog(anti_entropy_result.new_writes)
+                # print '[replica_server {} stabilize] new write history = {}'.format(self.id, self.write_log)
                 # process full write history to get an up-to-date key-value
                 # store
                 # TODO might only need to do this at end of loop, think about it
@@ -206,6 +209,44 @@ class ReplicaHandler:
     # Adds the writes that are contained in the parameter new_writes and then
     # sorts the list of writes
     def addNewWritesToWriteLog(self, new_writes):
+        # convert new writes from thrift format
+        formatted_new_writes = []
+        for new_write in new_writes:
+            formatted_new_writes.append(self.convertFromThriftFormat_writeLogEntry(new_write))
+        new_writes = formatted_new_writes
+        # remove overwritten writes by same client (needed to enforce monotonic
+        # reads). If two write log entries have the same 'client_id' and 'key',
+        # then the entry with the older 'client_time' should be deleted.
+        # first check if any of the new writes are invalid/overwritten because
+        # of this
+        pruned_new_writes = []
+        for new_write in new_writes:
+            client_id = new_write['client_id']
+            key = new_write['key']
+            client_time = new_write['client_time']
+            should_be_removed = False
+            for write in self.write_log:
+                if (client_id == write['client_id']) and (key == write['key']) and (client_time < write['client_time']):
+                    should_be_removed = True
+                    break
+            if not should_be_removed:
+                pruned_new_writes.append(new_write)
+        new_writes = pruned_new_writes
+        # next check if any of the existing entries in the write log are now
+        # invalid/overwritten
+        pruned_write_log = []
+        for write in self.write_log:
+            client_id = write['client_id']
+            key = write['key']
+            client_time = write['client_time']
+            should_be_removed = False
+            for new_write in new_writes:
+                if (client_id == new_write['client_id']) and (key == new_write['key']) and (client_time < new_write['client_time']):
+                    should_be_removed = True
+                    break
+            if not should_be_removed:
+                pruned_write_log.append(write)
+        self.write_log = pruned_write_log
         # add all new writes to this replica's write log
         for write in new_writes:
             write = self.convertFromThriftFormat_writeLogEntry(write)
@@ -274,6 +315,8 @@ class ReplicaHandler:
             'key': write_log_entry['key'],
             'value': write_log_entry['value'],
             'accept_time': int(write_log_entry['accept_time']),
-            'replica_id': int(write_log_entry['replica_id'])
+            'replica_id': int(write_log_entry['replica_id']),
+            'client_id': int(write_log_entry['client_id']),
+            'client_time': int(write_log_entry['client_time']),
         }
         return result

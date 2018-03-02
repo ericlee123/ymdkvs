@@ -19,6 +19,7 @@ class ClientHandler:
         self.stubs = dict()
         self.transports = dict()
         self.key_vectorclock_map = dict()
+        self.time = 0
 
     def setID(self, id):
         self.id = id
@@ -51,9 +52,10 @@ class ClientHandler:
         if key in self.key_vectorclock_map:
             vector_clock = self.key_vectorclock_map[key]
         self.transports[rid].open()
-        new_vector_clock = self.stubs[rid].write(key, value, self.id)
+        new_vector_clock = self.stubs[rid].write(key, value, self.id, self.time)
         self.key_vectorclock_map[key] = new_vector_clock
         self.transports[rid].close()
+        self.time += 1
 
     def requestRead(self, key):
         rid = random.sample(self.reachable, 1)[0]
